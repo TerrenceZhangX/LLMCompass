@@ -5,18 +5,21 @@ FROM continuumio/miniconda3
 WORKDIR /app
 
 # Create the conda environment
-COPY environment.yml /app/environment.yml
+COPY . /app
 RUN conda env create -f /app/environment.yml
 
-# Initialize conda in bash shell
-RUN echo "source activate llmcompass_ae" > ~/.bashrc
+# Do not rely on `source activate` in non-interactive shells; set PATH to the env's bin
 ENV PATH /opt/conda/envs/llmcompass_ae/bin:$PATH
 
-# Clone your GitHub repository
-RUN git clone https://github.com/HenryChang213/LLMCompass_ISCA_AE.git /app/LLMCompass_ISCA_AE
-RUN cd /app/LLMCompass_ISCA_AE && git submodule init && git submodule update --recursive
+# Install lightweight Python deps for the API server inside the conda env
+RUN /opt/conda/envs/llmcompass_ae/bin/pip install \
+    fastapi \
+    "uvicorn[standard]" \
+    aiosqlite \
+    requests
 
-# Expose the port your app runs on
+# Expose the port your app runs on and run uvicorn as entrypoint
 EXPOSE 8000
+# NOTE: CMD removed to allow interactive testing. Re-add the uvicorn CMD after verification.
 
 

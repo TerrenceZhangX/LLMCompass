@@ -133,7 +133,7 @@ def _simulate_conv_sync(kernel_name, input_dim, dtype_str, system_key=None):
 
 2. Update `_select_sync_simulator` in the same file to return your function when appropriate (e.g. `if "conv" in kn:`).
 
-3. Optionally add the op keyword to `get_supported_ops()` in `backend_app/simulator.py`.
+3. Optionally add the op keyword to `get_supported_ops()` in `backend_app/sim_utils.py`.
 
 4. Add unit and/or integration tests to cover happy-path and failure cases.
 

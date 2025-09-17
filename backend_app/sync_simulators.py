@@ -167,7 +167,7 @@ def _simulate_gelu_sync(
     latency = op.compile_and_simulate(device, compile_mode="heuristic-GPU")
     return {
         "status": "success",
-        "output": {"summary": "LayerNorm simulated"},
+        "output": {"summary": "GeLU simulated"},
         "time_taken": float(latency),
         "metadata": {
             "kernel_name": kernel_name,

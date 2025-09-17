@@ -177,8 +177,8 @@ def test_create_task_and_poll_matmul(matmul_payload):
                 if payload.get("kernel_name") == "itest_matmul_fp8_unsupported":
                     # this kernel is expected to be unsupported
                     assert (
-                        info.get("result", {}).get("metadata").get("error_code")
-                    ), "INVALID_INPUT"
+                        info.get("result", {}).get("metadata").get("error_code") == "INVALID_INPUT"
+                    ), f"error_code={info.get('result', {}).get('metadata').get('error_code')}"
                 elif payload.get("kernel_name") == "itest_matmul_M_1":
                     # this kernel is expected to be very fast
                     assert (

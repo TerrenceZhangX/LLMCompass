@@ -16,10 +16,10 @@ The backend is supported to run only via Docker. Build the image from the reposi
 sudo docker build -t llmcompass-backend .
 ```
 
-Run an interactive container with the repository mounted to `/app` (recommended for development):
+Run the docker container, which exposes 8000 to host for backend interaction:
 
 ```bash
-sudo docker run --rm -it -w /app --name llmcompass -v "$PWD":/app llmcompass-backend /bin/bash
+sudo docker run --rm -p 8000:8000 llmcompass-backend
 ```
 
 ## Environment variables

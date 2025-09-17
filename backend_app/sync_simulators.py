@@ -87,7 +87,7 @@ def _simulate_bmm_sync(
     latency = op.compile_and_simulate(device, compile_mode="heuristic-GPU")
     return {
         "status": "success",
-        "output": {"summary": "matmul simulated"},
+        "output": {"summary": "bmm simulated"},
         "time_taken": float(latency),
         "metadata": {
             "kernel_name": kernel_name,

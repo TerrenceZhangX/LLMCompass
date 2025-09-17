@@ -7,7 +7,7 @@ from typing import Any, List, Union, Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from backend_app.simulator import simulate_kernel_trace, process_kernel_simulation_task
+from backend_app.scheduler import simulate_kernel_trace, process_kernel_simulation_task
 
 
 @asynccontextmanager
@@ -18,7 +18,9 @@ async def lifespan(app: FastAPI):
 
     # create queue and start background worker
     app.state.queue = asyncio.Queue()
-    app.state.worker_task = asyncio.create_task(worker_loop(app.state.queue, app.state.tasks, app.state.tasks_lock))
+    app.state.worker_task = asyncio.create_task(
+        worker_loop(app.state.queue, app.state.tasks, app.state.tasks_lock)
+    )
 
     try:
         yield
@@ -34,6 +36,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="LLMCompass Kernel Simulator", lifespan=lifespan)
+
 
 class KernelTask(BaseModel):
     kernel_name: str
@@ -62,13 +65,17 @@ async def worker_loop(queue: asyncio.Queue, tasks: dict, lock: asyncio.Lock):
                 if task_id in tasks:
                     tasks[task_id]["status"] = "done"
                     tasks[task_id]["result"] = result
-                    tasks[task_id]["updated_at"] = datetime.datetime.utcnow().isoformat()
+                    tasks[task_id][
+                        "updated_at"
+                    ] = datetime.datetime.utcnow().isoformat()
         except Exception as e:
             async with lock:
                 if task_id in tasks:
                     tasks[task_id]["status"] = "failed"
                     tasks[task_id]["result"] = {"error": str(e)}
-                    tasks[task_id]["updated_at"] = datetime.datetime.utcnow().isoformat()
+                    tasks[task_id][
+                        "updated_at"
+                    ] = datetime.datetime.utcnow().isoformat()
         finally:
             queue.task_done()
 
@@ -101,17 +108,25 @@ async def create_task(t: KernelTask, wait: bool = False, timeout: float = 30.0):
 
     # synchronous path: process inline with timeout
     try:
-        result = await asyncio.wait_for(process_kernel_simulation_task(payload), timeout=timeout)
+        result = await asyncio.wait_for(
+            process_kernel_simulation_task(payload), timeout=timeout
+        )
     except asyncio.TimeoutError:
         # leave as queued for background worker to pick up later
-        return {"task_id": task_id, "status": "timeout", "message": f"processing did not finish within {timeout}s"}
+        return {
+            "task_id": task_id,
+            "status": "timeout",
+            "message": f"processing did not finish within {timeout}s",
+        }
     except Exception as e:
         # update in-memory store as failed
         async with app.state.tasks_lock:
             if task_id in app.state.tasks:
                 app.state.tasks[task_id]["status"] = "failed"
                 app.state.tasks[task_id]["result"] = {"error": str(e)}
-                app.state.tasks[task_id]["updated_at"] = datetime.datetime.utcnow().isoformat()
+                app.state.tasks[task_id][
+                    "updated_at"
+                ] = datetime.datetime.utcnow().isoformat()
         raise HTTPException(status_code=500, detail=str(e))
 
     # write result into in-memory store and return
@@ -119,14 +134,16 @@ async def create_task(t: KernelTask, wait: bool = False, timeout: float = 30.0):
         if task_id in app.state.tasks:
             app.state.tasks[task_id]["status"] = "done"
             app.state.tasks[task_id]["result"] = result
-            app.state.tasks[task_id]["updated_at"] = datetime.datetime.utcnow().isoformat()
+            app.state.tasks[task_id][
+                "updated_at"
+            ] = datetime.datetime.utcnow().isoformat()
 
     return {"task_id": task_id, "status": "done", "result": result}
 
 
 @app.get("/supported_ops")
 async def supported_ops():
-    from backend_app.simulator import get_supported_ops
+    from backend_app.sim_utils import get_supported_ops
 
     return {"supported_ops": get_supported_ops()}
 

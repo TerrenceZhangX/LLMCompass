@@ -20,6 +20,6 @@ RUN /opt/conda/envs/llmcompass_ae/bin/pip install \
 
 # Expose the port your app runs on and run uvicorn as entrypoint
 EXPOSE 8000
-# NOTE: CMD removed to allow interactive testing. Re-add the uvicorn CMD after verification.
 
-
+# Start the FastAPI server using Uvicorn when the container launches
+CMD ["uvicorn", "backend_app.main:app", "--host", "0.0.0.0", "--port", "8000"]

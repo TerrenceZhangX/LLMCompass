@@ -218,7 +218,7 @@ def _simulate_softmax_sync(
 
 
 def _simulate_fail(
-    kernel_name: str, _input_dim=None, _dtype_str: str = ""
+    kernel_name: str, _input_dim=None, _dtype_str: str = "", system_key: str = None,
 ) -> Dict[str, Any]:
     return _make_failure(
         kernel_name, "unsupported op - no generic simulator available", "UNSUPPORTED_OP"
@@ -229,15 +229,15 @@ def _select_sync_simulator(kernel_name: str):
     if not kernel_name:
         return _simulate_fail
     kn = kernel_name.lower()
-    if "matmul" in kn:
+    if kn == "matmul":
         return _simulate_matmul_sync
-    elif "bmm" in kn:
+    elif kn == "bmm":
         return _simulate_bmm_sync
-    elif "layernorm" in kn:
+    elif kn == "layernorm" in kn:
         return _simulate_layernorm_sync
-    elif "gelu" in kn:
+    elif kn == "gelu":
         return _simulate_gelu_sync
-    elif "softmax" in kn:
+    elif kn == "softmax":
         return _simulate_softmax_sync
     # conv and other ops are not supported unless explicitly implemented
     return _simulate_fail

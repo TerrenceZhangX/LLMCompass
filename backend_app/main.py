@@ -16,19 +16,27 @@ async def lifespan(app: FastAPI):
     app.state.tasks = {}
     app.state.tasks_lock = asyncio.Lock()
 
-    # create queue and start background worker
+    # create queue and start background workers
     app.state.queue = asyncio.Queue()
-    app.state.worker_task = asyncio.create_task(
-        worker_loop(app.state.queue, app.state.tasks, app.state.tasks_lock)
-    )
+    # number of concurrent background consumers (in-process). Use environment var WORKER_COUNT
+    try:
+        worker_count = int(os.environ.get("WORKER_COUNT", "32"))
+    except Exception:
+        worker_count = 1
+    app.state.worker_tasks = []
+    for i in range(max(1, worker_count)):
+        app.state.worker_tasks.append(
+            asyncio.create_task(worker_loop(app.state.queue, app.state.tasks, app.state.tasks_lock))
+        )
 
     try:
         yield
     finally:
         # shutdown: cancel background worker
-        worker = getattr(app.state, "worker_task", None)
-        if worker:
+        workers = getattr(app.state, "worker_tasks", None) or []
+        for worker in workers:
             worker.cancel()
+        for worker in workers:
             try:
                 await worker
             except asyncio.CancelledError:
@@ -171,4 +179,29 @@ async def get_task(task_id: str):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    # provide richer health info: queue size, worker tasks status, and task counts
+    queue = getattr(app.state, "queue", None)
+    workers = getattr(app.state, "worker_tasks", None) or []
+    tasks_store = getattr(app.state, "tasks", None) or {}
+
+    # summarize task states
+    counts = {"queued": 0, "running": 0, "done": 0, "failed": 0}
+    for entry in tasks_store.values():
+        st = entry.get("status")
+        if st in counts:
+            counts[st] += 1
+
+    worker_info = []
+    for w in workers:
+        try:
+            worker_info.append({"done": w.done(), "cancelled": w.cancelled()})
+        except Exception:
+            worker_info.append({"done": None, "cancelled": None})
+
+    return {
+        "status": "ok",
+        "queue_length": queue.qsize() if queue is not None else None,
+        "worker_count": len(workers),
+        "workers": worker_info,
+        "task_counts": counts,
+    }

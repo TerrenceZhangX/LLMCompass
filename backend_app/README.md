@@ -108,7 +108,7 @@ Task states may include `queued`, `running`, `done`, `failed` (scheduler/worker 
 ## Code layout and runtime flow
 
 Key modules:
-- `backend_app/simulator.py` — async entry points and dispatcher (`simulate_kernel_trace`, `process_kernel_simulation_task`).
+- `backend_app/scheduler.py` — async entry points and dispatcher (`simulate_kernel_trace`, `process_kernel_simulation_task`).
 - `backend_app/sim_utils.py` — shared helpers: dtype mapping, tensor construction, unified failure response helper `_make_failure`.
 - `backend_app/sync_simulators.py` — synchronous `_simulate_*` implementations (e.g. `_simulate_matmul_sync`) and `_select_sync_simulator`.
 

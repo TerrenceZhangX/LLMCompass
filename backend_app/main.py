@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     app.state.worker_tasks = []
     for i in range(max(1, worker_count)):
         app.state.worker_tasks.append(
-            asyncio.create_task(worker_loop(app.state.queue, app.state.tasks, app.state.tasks_lock))
+            asyncio.create_task(worker_loop(app.state.queue, app.state.tasks, app.state.tasks_lock, worker_id=i))
         )
 
     try:
@@ -56,7 +56,7 @@ class KernelTask(BaseModel):
     system_key: Optional[str] = None
 
 
-async def worker_loop(queue: asyncio.Queue, tasks: dict, lock: asyncio.Lock):
+async def worker_loop(queue: asyncio.Queue, tasks: dict, lock: asyncio.Lock, worker_id: int = 0):
     while True:
         task_id = await queue.get()
         try:
@@ -66,6 +66,10 @@ async def worker_loop(queue: asyncio.Queue, tasks: dict, lock: asyncio.Lock):
                     queue.task_done()
                     continue
                 payload = entry["payload"]
+                # mark as running and record worker id / start time
+                tasks[task_id]["status"] = "running"
+                tasks[task_id]["worker"] = worker_id
+                tasks[task_id]["started_at"] = datetime.datetime.utcnow().isoformat()
             # process (outside lock)
             result = await process_kernel_simulation_task(payload)
             async with lock:
@@ -115,6 +119,13 @@ async def create_task(t: KernelTask, wait: bool = False, timeout: float = 30.0):
 
     # synchronous path: process inline with timeout
     try:
+        # mark as running for synchronous (wait) path
+        async with app.state.tasks_lock:
+            if task_id in app.state.tasks:
+                app.state.tasks[task_id]["status"] = "running"
+                app.state.tasks[task_id]["worker"] = "inline"
+                app.state.tasks[task_id]["started_at"] = datetime.datetime.utcnow().isoformat()
+
         result = await asyncio.wait_for(
             process_kernel_simulation_task(payload), timeout=timeout
         )

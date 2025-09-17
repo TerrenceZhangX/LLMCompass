@@ -233,7 +233,7 @@ def _select_sync_simulator(kernel_name: str):
         return _simulate_matmul_sync
     elif kn == "bmm":
         return _simulate_bmm_sync
-    elif kn == "layernorm" in kn:
+    elif kn == "layernorm":
         return _simulate_layernorm_sync
     elif kn == "gelu":
         return _simulate_gelu_sync

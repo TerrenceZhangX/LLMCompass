@@ -3,7 +3,7 @@ import asyncio
 import json
 import datetime
 import os
-from typing import Any, List, Union, Optional
+from typing import List, Union, Optional, Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -41,8 +41,7 @@ app = FastAPI(title="LLMCompass Kernel Simulator", lifespan=lifespan)
 class KernelTask(BaseModel):
     kernel_name: str
     op: str
-    # allow either a flat shape like [M,K,N] or a pair of shapes for A and B
-    input_dim: Optional[Union[List[int], List[List[int]]]] = None
+    input_dim: Optional[Any] = None
     # some clients send a single dtype string, others send a list of dtype strings
     dtype: Optional[Union[str, List[str]]] = "fp32"
     # optional system key

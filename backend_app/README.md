@@ -33,7 +33,13 @@ sudo docker run --rm -p 8000:8000 llmcompass-backend
 - `POST /tasks` — submit a simulation task (returns `task_id`)
 - `GET /tasks/{task_id}` — query task status and result
 
-Example task payload (matmul):
+### Usage
+
+1. **Submit a task**: POST the payload to the /tasks endpoint (for example `requests.post(f"{BASE}/tasks", json=payload, timeout=5)`). On success (HTTP 200) parse the response JSON and read the returned `task_id`.  
+2. **Poll the task status**: GET `/tasks/{task_id}` (for example `requests.get(f"{BASE}/tasks/{task_id}", timeout=5)`) until the returned `status` is `done` (or `failed`). Handle non-200 responses and timeouts as needed.  
+3. **Parse the result**: when the task `status` is `done`, inspect the `result` object. The `result.status` field indicates whether the simulation succeeded (e.g., `success`) or failed. The `time_taken` field is the simulation duration in seconds. Other fields in `result` (for example `metadata`) describe the simulated kernel and the target system.
+
+Below is an example task payload for a matmul operation. When constructing payload, ensure the input_dim follows the simulator’s expected format for this operation (e.g., a list of two two-element dimension arrays).
 
 ```json
 {
@@ -45,7 +51,7 @@ Example task payload (matmul):
 }
 ```
 
-Example finished task (matmul):
+Below is an example of a completed matmul task, illustrating the response fields and their structure:
 ```json
 {
   "status_code": 200,
@@ -103,7 +109,7 @@ Example finished task (matmul):
 ```
 
 
-Task states may include `queued`, `running`, `done`, `failed` (scheduler/worker dependent).
+Task states: `queued`, `running`, `done`, `failed` (scheduler/worker-dependent). When a task is submitted it enters the `queued` state. A free worker picks up the next queued task and the state transitions to `running`. After execution finishes, the task becomes `done` on success or `failed` on error.
 
 ## Code layout and runtime flow
 

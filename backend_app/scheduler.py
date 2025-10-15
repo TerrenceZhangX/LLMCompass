@@ -26,7 +26,7 @@ async def simulate_kernel_trace(
     # simulator returns dict; validate and propagate structured failure
     if not isinstance(result, dict):
         return _make_failure(
-            kernel_name, "simulator returned invalid result type", "SIMULATOR_ERROR"
+            "simulator returned invalid result type", "SIMULATOR_ERROR"
         )
     # ensure failure results have error_code when possible
     if result.get("status") == "failed":
@@ -52,7 +52,6 @@ async def process_kernel_simulation_task(kernel_task: Dict[str, Any]) -> Dict[st
     # normalize to expected schema
     if res.get("status") == "failed":
         out = {
-            "kernel_name": kernel_name,
             "status": "failed",
             "output": None,
             "simulated_time": None,
@@ -60,7 +59,6 @@ async def process_kernel_simulation_task(kernel_task: Dict[str, Any]) -> Dict[st
         }
     else:
         out = {
-            "kernel_name": kernel_name,
             "status": res.get("status"),
             "output": res.get("output"),
             "simulated_time": res.get("simulated_time"),

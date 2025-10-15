@@ -25,10 +25,10 @@ def _simulate_matmul_sync(
 
     if dt is None:
         return _make_failure(
-            kernel_name, "invalid or unsupported dtype", "INVALID_INPUT"
+            "invalid or unsupported dtype", "INVALID_INPUT"
         )
     elif A_shape is None or B_shape is None:
-        return _make_failure(kernel_name, "invalid input dimension", "INVALID_INPUT")
+        return _make_failure("invalid input dimension", "INVALID_INPUT")
 
     op = Matmul(dt)
     A = _make_tensor(A_shape, dt)
@@ -36,10 +36,10 @@ def _simulate_matmul_sync(
     _ = op(A, B)
 
     if not system_key:
-        return _make_failure(kernel_name, "no valid system_key provided", "NO_SYSTEM")
+        return _make_failure("no valid system_key provided", "NO_SYSTEM")
     system = system_dict.get(system_key)
     if system is None:
-        return _make_missing_system(kernel_name, system_key)
+        return _make_missing_system(system_key)
 
     device = system.device
     latency = op.compile_and_simulate(device, compile_mode="heuristic-GPU")
@@ -62,10 +62,10 @@ def _simulate_bmm_sync(
 
     if dt is None:
         return _make_failure(
-            kernel_name, "invalid or unsupported dtype", "INVALID_INPUT"
+            "invalid or unsupported dtype", "INVALID_INPUT"
         )
     elif A_shape is None or B_shape is None:
-        return _make_failure(kernel_name, "invalid input dimension", "INVALID_INPUT")
+        return _make_failure("invalid input dimension", "INVALID_INPUT")
 
     op = BatchedMatmul(dt)
     A = _make_tensor(A_shape, dt)
@@ -73,10 +73,10 @@ def _simulate_bmm_sync(
     _ = op(A, B)
 
     if not system_key:
-        return _make_failure(kernel_name, "no valid system_key provided", "NO_SYSTEM")
+        return _make_failure("no valid system_key provided", "NO_SYSTEM")
     system = system_dict.get(system_key)
     if system is None:
-        return _make_missing_system(kernel_name, system_key)
+        return _make_missing_system(system_key)
 
     device = system.device
     latency = op.compile_and_simulate(device, compile_mode="heuristic-GPU")
@@ -98,20 +98,20 @@ def _simulate_layernorm_sync(
 
     if dt is None:
         return _make_failure(
-            kernel_name, "invalid or unsupported dtype", "INVALID_INPUT"
+            "invalid or unsupported dtype", "INVALID_INPUT"
         )
     elif A_shape is None:
-        return _make_failure(kernel_name, "invalid input dimension", "INVALID_INPUT")
+        return _make_failure("invalid input dimension", "INVALID_INPUT")
 
     op = LayerNorm(dt)
     A = _make_tensor(A_shape, dt)
     _ = op(A)
 
     if not system_key:
-        return _make_failure(kernel_name, "no valid system_key provided", "NO_SYSTEM")
+        return _make_failure("no valid system_key provided", "NO_SYSTEM")
     system = system_dict.get(system_key)
     if system is None:
-        return _make_missing_system(kernel_name, system_key)
+        return _make_missing_system(system_key)
 
     device = system.device
     latency = op.compile_and_simulate(device, compile_mode="heuristic-GPU")
@@ -133,20 +133,20 @@ def _simulate_gelu_sync(
 
     if dt is None:
         return _make_failure(
-            kernel_name, "invalid or unsupported dtype", "INVALID_INPUT"
+            "invalid or unsupported dtype", "INVALID_INPUT"
         )
     elif A_shape is None:
-        return _make_failure(kernel_name, "invalid input dimension", "INVALID_INPUT")
+        return _make_failure("invalid input dimension", "INVALID_INPUT")
 
     op = GeLu(dt)
     A = _make_tensor(A_shape, dt)
     _ = op(A)
 
     if not system_key:
-        return _make_failure(kernel_name, "no valid system_key provided", "NO_SYSTEM")
+        return _make_failure("no valid system_key provided", "NO_SYSTEM")
     system = system_dict.get(system_key)
     if system is None:
-        return _make_missing_system(kernel_name, system_key)
+        return _make_missing_system(system_key)
 
     device = system.device
     latency = op.compile_and_simulate(device, compile_mode="heuristic-GPU")
@@ -168,20 +168,20 @@ def _simulate_softmax_sync(
 
     if dt is None:
         return _make_failure(
-            kernel_name, "invalid or unsupported dtype", "INVALID_INPUT"
+            "invalid or unsupported dtype", "INVALID_INPUT"
         )
     elif A_shape is None:
-        return _make_failure(kernel_name, "invalid input dimension", "INVALID_INPUT")
+        return _make_failure("invalid input dimension", "INVALID_INPUT")
 
     op = Softmax(dt)
     A = _make_tensor(A_shape, dt)
     _ = op(A)
 
     if not system_key:
-        return _make_failure(kernel_name, "no valid system_key provided", "NO_SYSTEM")
+        return _make_failure("no valid system_key provided", "NO_SYSTEM")
     system = system_dict.get(system_key)
     if system is None:
-        return _make_missing_system(kernel_name, system_key)
+        return _make_missing_system(system_key)
 
     device = system.device
     latency = op.compile_and_simulate(device, compile_mode="heuristic-GPU")
@@ -196,7 +196,7 @@ def _simulate_fail(
     kernel_name: str, _input_dim=None, _dtype_str: str = "", system_key: str = None,
 ) -> Dict[str, Any]:
     return _make_failure(
-        kernel_name, "unsupported op - no generic simulator available", "UNSUPPORTED_OP"
+        "unsupported op - no generic simulator available", "UNSUPPORTED_OP"
     )
 
 

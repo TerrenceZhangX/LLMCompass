@@ -54,40 +54,36 @@ Below is an example task payload for a matmul operation. When constructing paylo
 Below is an example of a completed matmul task, illustrating the response fields and their structure:
 ```json
 {
-  "status_code": 200,
-  "body": {
-    "task_id": "089d0b13-2ef9-43e1-bde3-44ed7219e959",
-    "status": "done",
-    "result": {
-      "kernel_name": "itest_matmul_M_1",
-      "status": "success",
-      "output": {
-        "summary": "matmul simulated"
-      },
-      "simulated_time": 1.4408317802844531e-05,
+  "task_id": "089d0b13-2ef9-43e1-bde3-44ed7219e959",
+  "status": "done",
+  "result": {
+    "status": "success",
+    "output": {
+      "summary": "matmul simulated"
     },
-    "user_submitted_request": {
-      "kernel_name": "itest_matmul_M_1",
-      "op": "matmul",
-      "input_dim": [
-        [
-          1,
-          2048
-        ],
-        [
-          2048,
-          7168
-        ]
-      ],
-      "dtype": [
-        "c10::BFloat16",
-        "c10::BFloat16"
-      ],
-      "system_key": "A100_4_fp16"
+    "simulated_time": 1.4408317802844531e-05,
     },
-    "created_at": "2025-09-17T02:23:11.777675",
-    "updated_at": "2025-09-17T02:23:11.778457"
-  }
+  "user_submitted_request": {
+    "kernel_name": "itest_matmul_M_1",
+    "op": "matmul",
+    "input_dim": [
+      [
+        1,
+        2048
+      ],
+      [
+        2048,
+        7168
+      ]
+    ],
+    "dtype": [
+      "c10::BFloat16",
+      "c10::BFloat16"
+    ],
+    "system_key": "A100_4_fp16"
+  },
+  "created_at": "2025-09-17T02:23:11.777675",
+  "updated_at": "2025-09-17T02:23:11.778457"
 }
 ```
 
@@ -96,12 +92,10 @@ For failed tasks, the `result` includes a `failure_reason` object to aid root‑
 {
   ...
   "result": {
-    "kernel_name": ...,
     "status": "failed",
     "output": null,
     "simulated_time": null,
     "failure_reason": {
-      "kernel_name": ...,
       "error": "unsupported op - no generic simulator available",
       "error_code": "UNSUPPORTED_OP"
     }

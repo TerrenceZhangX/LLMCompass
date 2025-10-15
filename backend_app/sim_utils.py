@@ -20,22 +20,21 @@ def _make_tensor(shape, dtype_obj):
 
 
 # centralized failure helper to avoid repeated dict literals
-def _make_failure(kernel_name: str, error: str, error_code: str):
+def _make_failure(error: str, error_code: str):
     return {
         "status": "failed",
         "output": None,
         "time_taken": None,
         "metadata": {
-            "kernel_name": kernel_name,
             "error": error,
             "error_code": error_code,
         },
     }
 
 
-def _make_missing_system(kernel_name: str, system_key: str):
+def _make_missing_system(system_key: str):
     return _make_failure(
-        kernel_name, f"missing system configuration '{system_key}'", "NO_SYSTEM"
+        f"missing system configuration '{system_key}'", "NO_SYSTEM"
     )
 
 

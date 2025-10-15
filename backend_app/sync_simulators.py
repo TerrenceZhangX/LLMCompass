@@ -46,12 +46,7 @@ def _simulate_matmul_sync(
     return {
         "status": "success",
         "output": {"summary": "matmul simulated"},
-        "time_taken": float(latency),
-        "metadata": {
-            "kernel_name": kernel_name,
-            "input_dim": input_dim,
-            "dtype": dtype_str,
-        },
+        "simulated_time": float(latency),
     }
 
 
@@ -88,12 +83,7 @@ def _simulate_bmm_sync(
     return {
         "status": "success",
         "output": {"summary": "bmm simulated"},
-        "time_taken": float(latency),
-        "metadata": {
-            "kernel_name": kernel_name,
-            "input_dim": input_dim,
-            "dtype": dtype_str,
-        },
+        "simulated_time": float(latency),
     }
 
 
@@ -128,12 +118,7 @@ def _simulate_layernorm_sync(
     return {
         "status": "success",
         "output": {"summary": "LayerNorm simulated"},
-        "time_taken": float(latency),
-        "metadata": {
-            "kernel_name": kernel_name,
-            "input_dim": input_dim,
-            "dtype": dtype_str,
-        },
+        "simulated_time": float(latency),
     }
 
 
@@ -168,12 +153,7 @@ def _simulate_gelu_sync(
     return {
         "status": "success",
         "output": {"summary": "GeLU simulated"},
-        "time_taken": float(latency),
-        "metadata": {
-            "kernel_name": kernel_name,
-            "input_dim": input_dim,
-            "dtype": dtype_str,
-        },
+        "simulated_time": float(latency),
     }
 
 
@@ -208,12 +188,7 @@ def _simulate_softmax_sync(
     return {
         "status": "success",
         "output": {"summary": "Softmax simulated"},
-        "time_taken": float(latency),
-        "metadata": {
-            "kernel_name": kernel_name,
-            "input_dim": input_dim,
-            "dtype": dtype_str,
-        },
+        "simulated_time": float(latency),
     }
 
 

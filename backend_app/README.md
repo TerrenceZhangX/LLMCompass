@@ -64,26 +64,9 @@ Below is an example of a completed matmul task, illustrating the response fields
       "output": {
         "summary": "matmul simulated"
       },
-      "time_taken": 1.4408317802844531e-05,
-      "metadata": {
-        "kernel_name": "itest_matmul_M_1",
-        "input_dim": [
-          [
-            1,
-            2048
-          ],
-          [
-            2048,
-            7168
-          ]
-        ],
-        "dtype": [
-          "c10::BFloat16",
-          "c10::BFloat16"
-        ]
-      }
+      "simulated_time": 1.4408317802844531e-05,
     },
-    "payload": {
+    "user_submitted_request": {
       "kernel_name": "itest_matmul_M_1",
       "op": "matmul",
       "input_dim": [
@@ -108,6 +91,24 @@ Below is an example of a completed matmul task, illustrating the response fields
 }
 ```
 
+For failed tasks, the `result` includes a `failure_reason` object to aid root‑cause analysis. It typically contains fields like `kernel_name`, `error` (message), and `error_code`. Example:
+```json
+{
+  ...
+  "result": {
+    "kernel_name": ...,
+    "status": "failed",
+    "output": null,
+    "simulated_time": null,
+    "failure_reason": {
+      "kernel_name": ...,
+      "error": "unsupported op - no generic simulator available",
+      "error_code": "UNSUPPORTED_OP"
+    }
+  },
+  ...
+}
+```
 
 Task states: `queued`, `running`, `done`, `failed` (scheduler/worker-dependent). When a task is submitted it enters the `queued` state. A free worker picks up the next queued task and the state transitions to `running`. After execution finishes, the task becomes `done` on success or `failed` on error.
 

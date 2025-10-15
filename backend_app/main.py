@@ -182,7 +182,7 @@ async def get_task(task_id: str):
         "task_id": task_id,
         "status": status,
         "result": result,
-        "payload": payload,
+        "user_submitted_request": payload,
         "created_at": created_at,
         "updated_at": updated_at,
     }

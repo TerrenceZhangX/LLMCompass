@@ -13,7 +13,7 @@ async def simulate_kernel_trace(
     """
     Dispatch to real software_model simulations. Blocking compile_and_simulate calls are executed
     in a thread via asyncio.to_thread so the event loop is not blocked.
-    Returns standardized result: {status, output, time_taken, metadata}
+    Returns standardized result: {status, output, simulated_time}
     """
     # prefer op if provided (more specific), else fall back to kernel_name
     selector = op if op else kernel_name
@@ -50,13 +50,19 @@ async def process_kernel_simulation_task(kernel_task: Dict[str, Any]) -> Dict[st
     )
     end = time.time()
     # normalize to expected schema
-    out = {
-        "kernel_name": kernel_name,
-        "status": res.get("status", "failed"),
-        "output": res.get("output"),
-        "time_taken": res.get("time_taken", end - start),
-        "metadata": res.get(
-            "metadata", {"op": op, "input_dim": input_dim, "dtype": dtype}
-        ),
-    }
+    if res.get("status") == "failed":
+        out = {
+            "kernel_name": kernel_name,
+            "status": "failed",
+            "output": None,
+            "simulated_time": None,
+            "failure_reason": res.get("metadata", {}),
+        }
+    else:
+        out = {
+            "kernel_name": kernel_name,
+            "status": res.get("status"),
+            "output": res.get("output"),
+            "simulated_time": res.get("simulated_time"),
+        }
     return out

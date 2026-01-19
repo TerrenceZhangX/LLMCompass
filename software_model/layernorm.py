@@ -166,6 +166,115 @@ class LayerNorm(Operator):
             total_cycle_count += l2_tiles[m].write_cycle_count
         return total_cycle_count
 
+    def profile(self, pcb_module: Device):
+        word_size = getattr(getattr(self, "data_type", None), "word_size", None)
+        if not isinstance(word_size, int) or word_size <= 0:
+            word_size = 2
+
+        m = getattr(self, "M", None)
+        n = getattr(self, "N", None)
+        try:
+            m = int(m)
+            n = int(n)
+        except (TypeError, ValueError):
+            return super().profile(pcb_module)
+        if m <= 0 or n <= 0:
+            return super().profile(pcb_module)
+
+        mapping = getattr(self, "best_mapping", None)
+        l1_tm = getattr(mapping, "l1_tile_M", None) if mapping is not None else None
+        l1_tn = getattr(mapping, "l1_tile_N", None) if mapping is not None else None
+        if not (isinstance(l1_tm, int) and isinstance(l1_tn, int) and l1_tm > 0 and l1_tn > 0):
+            return super().profile(pcb_module)
+
+        base = float(m * n * word_size)
+
+        # Strict mapping consistent with simulate_l2_tile_compute_cycle_count:
+        # - DRAM<->L2: one full tensor read + one full tensor write.
+        # - L2<->core baseline: 3 reads + 1 write => 4 * base.
+        # - Reduction: (tiles_n - 1) * reduction_cycle_count, where the bandwidth term
+        #   corresponds to 2 * (l1_tile_M*l1_tile_N*word_size) bytes per step.
+        dram_bytes = 2.0 * base
+        l2_bytes = 4.0 * base
+
+        tiles_n = (n + l1_tn - 1) // l1_tn
+        reduction_steps = max(int(tiles_n) - 1, 0)
+
+        core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", None)
+        l2_tm = getattr(mapping, "l2_tile_M", None)
+        occ = 0.0
+        act_cta = 0.0
+        grid_size = 0.0
+        try:
+            core_count = int(core_count)
+        except (TypeError, ValueError):
+            core_count = None
+        if isinstance(core_count, int) and core_count <= 0:
+            core_count = None
+
+        try:
+            l2_tm = int(l2_tm)
+        except (TypeError, ValueError):
+            l2_tm = None
+        if not (isinstance(l2_tm, int) and l2_tm > 0):
+            # Some mappings omit l2 tiling for row-wise layernorm; model as one L2 tile.
+            l2_tm = int(m)
+
+        if isinstance(core_count, int) and core_count > 0 and isinstance(l2_tm, int) and l2_tm > 0:
+            l2_tile_count = (m + l2_tm - 1) // l2_tm
+            total_tiles = 0
+            total_slots = 0
+            peak_active = 0
+            red_step_bytes_per_tile = 2.0 * float(l1_tm * l1_tn * word_size)
+
+            for li in range(int(l2_tile_count)):
+                m_tile = int(l2_tm) if li < int(l2_tile_count) - 1 else int(m - int(l2_tm) * (int(l2_tile_count) - 1))
+                if m_tile <= 0:
+                    continue
+                l1_tile_count = ((m_tile + l1_tm - 1) // l1_tm) * ((n + l1_tn - 1) // l1_tn)
+                batches = (int(l1_tile_count) + int(core_count) - 1) // int(core_count)
+
+                total_tiles += int(l1_tile_count)
+                total_slots += int(batches) * int(core_count)
+                peak_active = max(peak_active, min(int(l1_tile_count), int(core_count)))
+
+                l2_bytes += float(batches) * float(reduction_steps) * red_step_bytes_per_tile
+
+            if total_slots > 0:
+                occ = float(total_tiles) / float(total_slots)
+                act_cta = float(peak_active)
+            grid_size = float(total_tiles)
+
+        l1_bytes = float(l2_bytes)
+        smem_bytes = 0.0
+        reg_bytes = 0.0
+
+        out = super().profile(pcb_module)
+        out["traffic_bytes"]["dram"] = dram_bytes
+        out["traffic_bytes"]["l2"] = l2_bytes
+        out["traffic_bytes"]["l1"] = l1_bytes
+        out["traffic_bytes"]["smem"] = smem_bytes
+        out["traffic_bytes"]["reg"] = reg_bytes
+
+        l2_access = float(l2_bytes)
+        l2_miss = min(float(dram_bytes), l2_access)
+        l2_hit = l2_access - l2_miss
+        out["cache"]["l2_accesses"] = l2_access
+        out["cache"]["l2_hits"] = l2_hit
+        out["cache"]["l2_hit_rate"] = (l2_hit / l2_access) if l2_access > 0 else 0.0
+
+        l1_access = float(l1_bytes)
+        l1_miss = min(float(l2_bytes), l1_access)
+        l1_hit = l1_access - l1_miss
+        out["cache"]["l1_accesses"] = l1_access
+        out["cache"]["l1_hits"] = l1_hit
+        out["cache"]["l1_hit_rate"] = (l1_hit / l1_access) if l1_access > 0 else 0.0
+
+        out["parallelism"]["occupancy"] = occ
+        out["parallelism"]["active_ctas"] = act_cta
+        out["parallelism"]["grid_size"] = grid_size
+        return out
+
     class L2TileSimulator:
         def __init__(
             self,
@@ -280,8 +389,8 @@ class LayerNorm(Operator):
             self,
             M: int,
             N: int,
-            data_type: DataType,
-            mapping: "LayerNorm.Mapping",
+            _data_type: DataType,
+            _mapping: "LayerNorm.Mapping",
             pcb_module: Device,
         ):
             M_per_vector_count = ceil(
@@ -334,20 +443,20 @@ class LayerNorm(Operator):
         # from apex.normalization.fused_layer_norm import FusedLayerNorm
         # from apex.contrib.layer_norm import FastLayerNorm
         assert self.shape is not None
-        input = torch.randn(self.shape, dtype=torch.float16, device="cuda")
+        inp = torch.randn(self.shape, dtype=torch.float16, device="cuda")
         latencies = []
 
         # warmup
         for _ in range(3):
-            _ = layernorm_gpu(input)
+            _ = layernorm_gpu(inp)
 
             torch.cuda.synchronize()
         for _ in range(self.iterations):
             start = time.time()
-            output = layernorm_gpu(input)
+            output = layernorm_gpu(inp)
             torch.cuda.synchronize()
             end = time.time()
-            assert output.shape == input.shape
+            assert output.shape == inp.shape
             latencies.append(end - start)
         # print(latencies)
         self.latency_on_gpu = statistics.median(latencies)
@@ -355,14 +464,11 @@ class LayerNorm(Operator):
 
     @staticmethod
     def gpu_kernel_launch_overhead():
-        import torch
-
-        size = 1
         latencies = []
         a = torch.randn(1, 1, 1, device="cuda")
         for _ in range(50):
             start = time.time()
-            c = layernorm_gpu(a)
+            _ = layernorm_gpu(a)
             torch.cuda.synchronize()
             end = time.time()
             latencies.append(end - start)

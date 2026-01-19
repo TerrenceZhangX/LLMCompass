@@ -309,15 +309,132 @@ class Softmax(Operator):
         self.latency_on_gpu = statistics.median(latencies)
         return self.latency_on_gpu
 
+    def profile(self, pcb_module: Device):
+        word_size = getattr(getattr(self, "data_type", None), "word_size", None)
+        if not isinstance(word_size, int) or word_size <= 0:
+            word_size = 2
+
+        m = getattr(self, "M", None)
+        n = getattr(self, "N", None)
+        try:
+            m = int(m)
+            n = int(n)
+        except (TypeError, ValueError):
+            return super().profile(pcb_module)
+        if m <= 0 or n <= 0:
+            return super().profile(pcb_module)
+
+        mapping = getattr(self, "best_mapping", None)
+        l1_tm = getattr(mapping, "l1_tile_M", None) if mapping is not None else None
+        l1_tn = getattr(mapping, "l1_tile_N", None) if mapping is not None else None
+        if not (isinstance(l1_tm, int) and isinstance(l1_tn, int) and l1_tm > 0 and l1_tn > 0):
+            return super().profile(pcb_module)
+
+        base = float(m * n * word_size)
+
+        # DRAM<->L2: simulator's L2 tile IO is a full read + full write.
+        dram_bytes = 2.0 * base
+
+        # Reduction steps per L2 tile: log2(ceil(N/l1_tile_N))
+        tiles_n = (n + l1_tn - 1) // l1_tn
+        reduction_steps = float(log2(tiles_n)) if tiles_n > 1 else 0.0
+
+        # L2<->core bytes:
+        # - Baseline: every element is read once and written once at the L2<->core boundary.
+        # - Reduction: match simulator structure per L2 tile:
+        #     (ceil(l1_tile_count/core_count) + 1) * reduction_steps * reduction_cycle_count
+        #   and reduction_cycle_count's bandwidth term corresponds to:
+        #     2 * (l1_tile_M*l1_tile_N*word_size) bytes per reduction step.
+        core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", None)
+        l2_tm = getattr(mapping, "l2_tile_M", None)
+        l2_bytes = 2.0 * base
+        occ = 0.0
+        act_cta = 0.0
+        grid_size = 0.0
+        try:
+            core_count = int(core_count)
+        except (TypeError, ValueError):
+            core_count = None
+        if isinstance(core_count, int) and core_count <= 0:
+            core_count = None
+
+        try:
+            l2_tm = int(l2_tm)
+        except (TypeError, ValueError):
+            l2_tm = None
+        if not (isinstance(l2_tm, int) and l2_tm > 0):
+            # Some mappings omit l2 tiling for row-wise softmax; model as one L2 tile.
+            l2_tm = int(m)
+
+        if isinstance(core_count, int) and core_count > 0 and isinstance(l2_tm, int) and l2_tm > 0:
+            l2_tile_count = (m + l2_tm - 1) // l2_tm
+            total_tiles = 0
+            total_slots = 0
+            peak_active = 0
+            # Reduction bytes per reduction step per L1 tile (bandwidth term, strict to simulator)
+            red_step_bytes_per_tile = 2.0 * float(l1_tm * l1_tn * word_size)
+
+            for li in range(int(l2_tile_count)):
+                m_tile = int(l2_tm) if li < int(l2_tile_count) - 1 else int(m - int(l2_tm) * (int(l2_tile_count) - 1))
+                if m_tile <= 0:
+                    continue
+                l1_tile_count = ((m_tile + l1_tm - 1) // l1_tm) * ((n + l1_tn - 1) // l1_tn)
+                waves = (int(l1_tile_count) + int(core_count) - 1) // int(core_count)
+                modeled_batches = waves + 1
+
+                total_tiles += int(l1_tile_count)
+                total_slots += int(modeled_batches) * int(core_count)
+                peak_active = max(peak_active, min(int(l1_tile_count), int(core_count)))
+
+                l2_bytes += float(modeled_batches) * reduction_steps * red_step_bytes_per_tile
+
+            if total_slots > 0:
+                occ = float(total_tiles) / float(total_slots)
+                act_cta = float(peak_active)
+            grid_size = float(total_tiles)
+
+        # On NVIDIA-like GPUs, L2->core traffic traverses the per-SM L1 path.
+        l1_bytes = float(l2_bytes)
+        smem_bytes = 0.0
+        reg_bytes = 0.0
+
+        out = super().profile(pcb_module)
+        out["traffic_bytes"]["dram"] = dram_bytes
+        out["traffic_bytes"]["l2"] = l2_bytes
+        out["traffic_bytes"]["l1"] = l1_bytes
+        out["traffic_bytes"]["smem"] = smem_bytes
+        out["traffic_bytes"]["reg"] = reg_bytes
+
+        # Cache (byte-based, strict): L2 misses bounded by DRAM traffic; any extra
+        # L2 traffic (e.g., reductions) must be served by on-chip reuse.
+        l2_access = float(l2_bytes)
+        l2_miss = min(float(dram_bytes), l2_access)
+        l2_hit = l2_access - l2_miss
+        out["cache"]["l2_accesses"] = l2_access
+        out["cache"]["l2_hits"] = l2_hit
+        out["cache"]["l2_hit_rate"] = (l2_hit / l2_access) if l2_access > 0 else 0.0
+
+        l1_access = float(l1_bytes)
+        l1_miss = min(float(l2_bytes), l1_access)
+        l1_hit = l1_access - l1_miss
+        out["cache"]["l1_accesses"] = l1_access
+        out["cache"]["l1_hits"] = l1_hit
+        out["cache"]["l1_hit_rate"] = (l1_hit / l1_access) if l1_access > 0 else 0.0
+
+        out["parallelism"]["occupancy"] = occ
+        out["parallelism"]["active_ctas"] = act_cta
+        out["parallelism"]["grid_size"] = grid_size
+        return out
+
     @staticmethod
     def gpu_kernel_launch_overhead():
-        size = 1
+        tensor_size = 1
         latencies = []
         for _ in range(50):
-            a = torch.randn(size, size, device="cuda")
+            a = torch.randn(tensor_size, tensor_size, device="cuda")
             torch.cuda.synchronize()
             start = time.time()
-            c = torch.softmax(a, dim=-1)
+            _ = torch.softmax(a, dim=-1)
             torch.cuda.synchronize()
             end = time.time()
             latencies.append(end - start)

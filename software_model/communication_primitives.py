@@ -1,12 +1,10 @@
 from hardware_model.device import Device
 from hardware_model.interconnect import (
-    LinkModule,
     InterConnectModule,
     TopologyType,
-    interconnect_module_dict,
 )
 from software_model.utils import Tensor, DataType
-from typing import Any, List
+from typing import Any
 from utils import size
 from math import ceil
 
@@ -17,10 +15,38 @@ class CommunicationPrimitive:
         # simulation results
         self.latency = None
 
+    def profile(self, pcb_module: Device):
+        _ = pcb_module
+        # Contract v0.2 requires stable keys; for communication primitives we model
+        # buffer movement but do not model cache/occupancy in detail.
+        return {
+            "traffic_bytes": {
+                "dram": 0.0,
+                "l2": 0.0,
+                "l1": 0.0,
+                "smem": 0.0,
+                "reg": 0.0,
+            },
+            "cache": {
+                "l2_hits": 0.0,
+                "l2_accesses": 0.0,
+                "l2_hit_rate": 0.0,
+                "l1_hits": 0.0,
+                "l1_accesses": 0.0,
+                "l1_hit_rate": 0.0,
+            },
+            "parallelism": {
+                "occupancy": 0.0,
+                "active_ctas": 0.0,
+                "grid_size": 0.0,
+            },
+        }
+
 
 class AllReduceMultiPCB(CommunicationPrimitive):
     def __init__(self, data_type: DataType) -> None:
         super().__init__(data_type)
+        self.input_shape = None
 
     def __call__(self, tensor: Tensor) -> Any:
         assert tensor.data_type == self.data_type
@@ -36,7 +62,7 @@ class AllReduceMultiPCB(CommunicationPrimitive):
             interconnect_module.link_module.bandwidth_both_direction
         )
         link_latency = interconnect_module.link_module.latency
-        flit_size = interconnect_module.link_module.flit_size
+        _flit_size = interconnect_module.link_module.flit_size
         header_size = interconnect_module.link_module.header_size
         max_payload_size = interconnect_module.link_module.max_payload_size
         link_count_per_device = interconnect_module.link_count_per_device
@@ -91,6 +117,40 @@ class AllReduceMultiPCB(CommunicationPrimitive):
         else:
             raise NotImplementedError
         return self.latency
+
+    def profile(self, pcb_module: Device):
+        out = super().profile(pcb_module)
+        input_shape = getattr(self, "input_shape", None)
+        word_size = getattr(getattr(self, "data_type", None), "word_size", None)
+        if not isinstance(word_size, int) or word_size <= 0:
+            word_size = 2
+        shape = input_shape if isinstance(input_shape, (list, tuple)) else None
+        if shape is not None:
+            total = 1
+            for d in list(shape):
+                if not isinstance(d, int) or d < 0:
+                    total = None
+                    break
+                total *= d
+            if total is not None:
+                payload = float(total) * float(word_size)
+                # Strict per-device memory traffic: read input buffer + write output buffer.
+                # (Network traffic is modeled separately by interconnect timing, not as cache traffic.)
+                bytes_moved = 2.0 * payload
+
+                out["traffic_bytes"]["dram"] = bytes_moved
+                out["traffic_bytes"]["l2"] = bytes_moved
+                out["traffic_bytes"]["l1"] = bytes_moved
+                out["traffic_bytes"]["smem"] = 0.0
+                out["traffic_bytes"]["reg"] = 0.0
+
+                out["cache"]["l2_accesses"] = bytes_moved
+                out["cache"]["l2_hits"] = 0.0
+                out["cache"]["l2_hit_rate"] = 0.0
+                out["cache"]["l1_accesses"] = bytes_moved
+                out["cache"]["l1_hits"] = 0.0
+                out["cache"]["l1_hit_rate"] = 0.0
+        return out
 
 
 # class P2P:

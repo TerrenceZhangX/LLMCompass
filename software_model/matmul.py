@@ -20,6 +20,10 @@ class BatchedMatmul(Operator):
         self.input1_shape = None
         self.input2_shape = None
         self.output_shape = None
+        # Profiling support (populated by compile_and_simulate)
+        self._chosen_strategy = None  # "bmm" | "fused_k" | None
+        self._matmul_best_mapping = None
+        self._matmul_shape = None  # (M, N, K)
 
     def __call__(self, input1: Tensor, input2: Tensor) -> Tensor:
         # [b, M, K] * [b, K, N] = [b, M, N]
@@ -55,25 +59,34 @@ class BatchedMatmul(Operator):
     #     return self.latency
 
     def compile_and_simulate(self, pcb_module: Device, compile_mode: str):
-        matmul = Matmul(self.data_type)
-        _ = matmul(Tensor([self.M, self.K]), Tensor([self.K, self.N]))
-        matmul_latency1 = (
-            matmul.compile_and_simulate(pcb_module, compile_mode) * self.bs
-        )
+        # Strategy 1: bs independent GEMMs (bmm)
+        matmul1 = Matmul(self.data_type)
+        _ = matmul1(Tensor([self.M, self.K]), Tensor([self.K, self.N]))
+        matmul_latency1 = matmul1.compile_and_simulate(pcb_module, compile_mode) * self.bs
 
-        matmul = Matmul(self.data_type)
-        _ = matmul(
-            Tensor([self.M, self.K * self.bs]), Tensor([self.K * self.bs, self.N])
-        )
+        # Strategy 2: fuse batch into K (model-specific heuristic) + reduction overhead
+        matmul2 = Matmul(self.data_type)
+        _ = matmul2(Tensor([self.M, self.K * self.bs]), Tensor([self.K * self.bs, self.N]))
         matmul_latency2 = (
-            matmul.compile_and_simulate(pcb_module, compile_mode)
+            matmul2.compile_and_simulate(pcb_module, compile_mode)
             + (self.bs - 1)
             * self.M
             * self.N
             * self.data_type.word_size
             / pcb_module.io_module.bandwidth
         )
-        self.latency = min(matmul_latency1, matmul_latency2)
+
+        if matmul_latency1 <= matmul_latency2:
+            self._chosen_strategy = "bmm"
+            self._matmul_best_mapping = copy.deepcopy(getattr(matmul1, "best_mapping", None))
+            self._matmul_shape = (int(self.M), int(self.N), int(self.K))
+            self.latency = float(matmul_latency1)
+        else:
+            self._chosen_strategy = "fused_k"
+            self._matmul_best_mapping = copy.deepcopy(getattr(matmul2, "best_mapping", None))
+            self._matmul_shape = (int(self.M), int(self.N), int(self.K * self.bs))
+            self.latency = float(matmul_latency2)
+
         return self.latency
 
     def run_on_gpu(
@@ -117,6 +130,84 @@ class BatchedMatmul(Operator):
         # print('GPU kernel launch overhead: ', avg_overhead*1e3, 'ms')
         # print(latencies)
         return avg_overhead
+
+    def profile(self, pcb_module: Device):
+        # Strict profile: reuse the chosen Matmul mapping when available.
+        bs = getattr(self, "bs", None)
+        m = getattr(self, "M", None)
+        n = getattr(self, "N", None)
+        k = getattr(self, "K", None)
+        if not all(isinstance(x, int) and x > 0 for x in (bs, m, n, k)):
+            return super().profile(pcb_module)
+
+        word_size = getattr(getattr(self, "data_type", None), "word_size", None)
+        if not isinstance(word_size, int) or word_size <= 0:
+            word_size = 2
+
+        mapping = getattr(self, "_matmul_best_mapping", None)
+        shape = getattr(self, "_matmul_shape", None)
+        strategy = getattr(self, "_chosen_strategy", None)
+        if mapping is not None and isinstance(shape, tuple) and len(shape) == 3:
+            mm_m, mm_n, mm_k = shape
+            mm = Matmul(self.data_type)
+            mm.M, mm.N, mm.K = int(mm_m), int(mm_n), int(mm_k)
+            mm.best_mapping = mapping
+            base = mm.profile(pcb_module)
+
+            if strategy == "bmm":
+                scale = float(bs)
+                for k0 in ("dram", "l2", "l1", "smem", "reg"):
+                    base["traffic_bytes"][k0] = float(base["traffic_bytes"].get(k0, 0.0) or 0.0) * scale
+                # Cache counters are in bytes; scale them similarly.
+                for k0 in ("l2_hits", "l2_accesses", "l1_hits", "l1_accesses"):
+                    base["cache"][k0] = float(base["cache"].get(k0, 0.0) or 0.0) * scale
+                # Hit rates remain ratios; keep as-is.
+                base["parallelism"]["grid_size"] = float(base["parallelism"].get("grid_size", 0.0) or 0.0) * scale
+
+                # Derived matmul counters (grid_size_mn scales with batch; k_partitions_avg stays the same).
+                d = base.get("derived") if isinstance(base.get("derived"), dict) else None
+                dm = d.get("matmul") if isinstance(d, dict) and isinstance(d.get("matmul"), dict) else None
+                if isinstance(dm, dict):
+                    if isinstance(dm.get("grid_size_mn"), (int, float)):
+                        dm["grid_size_mn"] = float(dm["grid_size_mn"]) * scale
+                    d["matmul"]["l1_loop_order"] = str(getattr(mapping, "l1_loop_order", ""))
+                    d["matmul"]["l2_loop_order"] = str(getattr(mapping, "l2_loop_order", ""))
+                return base
+
+            if strategy == "fused_k":
+                # Model-specific reduction overhead is expressed using IO bandwidth in compile.
+                # Treat it as additional streaming DRAM/L2/L1 traffic on the output matrix.
+                extra = float((bs - 1) * m * n * word_size)
+                for k0 in ("dram", "l2", "l1"):
+                    base["traffic_bytes"][k0] = float(base["traffic_bytes"].get(k0, 0.0) or 0.0) + extra
+                base["cache"]["l2_accesses"] = float(base["cache"].get("l2_accesses", 0.0) or 0.0) + extra
+                base["cache"]["l1_accesses"] = float(base["cache"].get("l1_accesses", 0.0) or 0.0) + extra
+                # Recompute hit rates (still conservative / best-effort).
+                l2_a = float(base["cache"].get("l2_accesses", 0.0) or 0.0)
+                l2_h = float(base["cache"].get("l2_hits", 0.0) or 0.0)
+                base["cache"]["l2_hit_rate"] = (l2_h / l2_a) if l2_a > 0 else 0.0
+                l1_a = float(base["cache"].get("l1_accesses", 0.0) or 0.0)
+                l1_h = float(base["cache"].get("l1_hits", 0.0) or 0.0)
+                base["cache"]["l1_hit_rate"] = (l1_h / l1_a) if l1_a > 0 else 0.0
+                return base
+
+            # Unknown strategy -> fall back to base matmul-derived profile.
+            return base
+
+        # Fallback: algorithmic global-memory bytes (still strict/non-null).
+        elem_io = bs * (m * k + k * n + m * n)
+        bytes_total = float(elem_io) * float(word_size)
+        out = super().profile(pcb_module)
+        out["traffic_bytes"]["dram"] = bytes_total
+        out["traffic_bytes"]["l2"] = bytes_total
+        out["traffic_bytes"]["l1"] = bytes_total
+        out["cache"]["l2_accesses"] = bytes_total
+        out["cache"]["l2_hits"] = 0.0
+        out["cache"]["l2_hit_rate"] = 0.0
+        out["cache"]["l1_accesses"] = bytes_total
+        out["cache"]["l1_hits"] = 0.0
+        out["cache"]["l1_hit_rate"] = 0.0
+        return out
 
 
 class Matmul(Operator):
@@ -258,6 +349,280 @@ class Matmul(Operator):
             print(
                 f"l0_M_tiling_factor: {self.l0_M_tiling_factor}, l0_N_tiling_factor: {self.l0_N_tiling_factor}, l0_K_tiling_factor: {self.l0_K_tiling_factor}"
             )
+
+    def profile(self, pcb_module: Device):
+        """Expose best-effort hierarchy traffic + cache/parallelism proxies.
+
+        - traffic_bytes.dram: DRAM<->L2 bytes, following the same reuse logic as simulate() for L2 tiles.
+        - traffic_bytes.l2: L2<->core bytes (proxy) derived from inner L1-tile batching model.
+        - traffic_bytes.smem/l1: on-core SRAM traffic derived from L1/L0 tiling loops.
+        - traffic_bytes.reg: register traffic proxy derived from L0 K-partition reductions.
+        - cache.l2_hit_rate: byte-based proxy derived from l2_accesses vs dram_reads.
+        - parallelism.occupancy/active_ctas: proxy derived from inner batching vs core_count.
+        """
+
+        if self.best_mapping is None:
+            return super().profile(pcb_module)
+
+        mapping = self.best_mapping
+        m = getattr(self, "M", None)
+        n = getattr(self, "N", None)
+        k = getattr(self, "K", None)
+        if not all(isinstance(x, int) and x > 0 for x in (m, n, k)):
+            return super().profile(pcb_module)
+
+        word_size = getattr(getattr(self, "data_type", None), "word_size", None)
+        if not isinstance(word_size, int) or word_size <= 0:
+            word_size = 2
+
+        l2_tile_m = int(getattr(mapping, "l2_tile_M", 0) or 0)
+        l2_tile_n = int(getattr(mapping, "l2_tile_N", 0) or 0)
+        l2_tile_k = int(getattr(mapping, "l2_tile_K", 0) or 0)
+        if min(l2_tile_m, l2_tile_n, l2_tile_k) <= 0:
+            return super().profile(pcb_module)
+
+        def ceil_div(a: int, b: int) -> int:
+            return (a + b - 1) // b
+
+        def dim_size(idx: int, tile: int, total: int) -> int:
+            start = idx * tile
+            if start >= total:
+                return 0
+            return min(tile, total - start)
+
+        outer_m = ceil_div(m, l2_tile_m)
+        outer_n = ceil_div(n, l2_tile_n)
+        outer_k = ceil_div(k, l2_tile_k)
+
+        def mk_elems(mi: int, ki: int) -> int:
+            return dim_size(mi, l2_tile_m, m) * dim_size(ki, l2_tile_k, k)
+
+        def kn_elems(ki: int, ni: int) -> int:
+            return dim_size(ki, l2_tile_k, k) * dim_size(ni, l2_tile_n, n)
+
+        def mn_elems(mi: int, ni: int) -> int:
+            return dim_size(mi, l2_tile_m, m) * dim_size(ni, l2_tile_n, n)
+
+        dram_read_bytes = 0.0
+        dram_write_bytes = 0.0
+
+        first = True
+        prev_m = prev_n = prev_k = 0
+        for mi, ni, ki in Matmul.generate_tile_loops(outer_m, outer_n, outer_k, mapping.l2_loop_order):
+            if first:
+                dram_read_bytes += float(mk_elems(mi, ki) + kn_elems(ki, ni)) * float(word_size)
+                prev_m, prev_n, prev_k = mi, ni, ki
+                first = False
+                continue
+
+            # current tile read
+            if mi == prev_m and ki == prev_k:
+                dram_read_bytes += float(kn_elems(ki, ni)) * float(word_size)
+            elif ni == prev_n and ki == prev_k:
+                dram_read_bytes += float(mk_elems(mi, ki)) * float(word_size)
+            else:
+                dram_read_bytes += float(mk_elems(mi, ki) + kn_elems(ki, ni)) * float(word_size)
+            if ki > 0 and not (mi == prev_m and ni == prev_n):
+                dram_read_bytes += float(mn_elems(mi, ni)) * float(word_size)
+
+            # previous tile write
+            if not (mi == prev_m and ni == prev_n):
+                dram_write_bytes += float(mn_elems(prev_m, prev_n)) * float(word_size)
+
+            prev_m, prev_n, prev_k = mi, ni, ki
+
+        if not first:
+            dram_write_bytes += float(mn_elems(prev_m, prev_n)) * float(word_size)
+
+        # L2 bytes (L2<->core) proxy: re-use the L1-tile batching logic (see L2TileSimulator.simulate_l2_tile_compute_cycle_count)
+        l1_tile_m = int(getattr(mapping, "l1_tile_M", 0) or 0)
+        l1_tile_n = int(getattr(mapping, "l1_tile_N", 0) or 0)
+        l1_tile_k = int(getattr(mapping, "l1_tile_K", 0) or 0)
+        if min(l1_tile_m, l1_tile_n, l1_tile_k) <= 0:
+            out = super().profile(pcb_module)
+            out["traffic_bytes"]["dram"] = float(dram_read_bytes + dram_write_bytes)
+            return out
+
+        input_word_size = getattr(getattr(pcb_module.compute_module.core, "systolic_array", None), "input_word_size", word_size)
+        output_word_size = getattr(getattr(pcb_module.compute_module.core, "systolic_array", None), "output_word_size", word_size)
+        if not isinstance(input_word_size, (int, float)):
+            input_word_size = word_size
+        if not isinstance(output_word_size, (int, float)):
+            output_word_size = word_size
+
+        core_count = int(getattr(pcb_module.compute_module, "core_count", 1) or 1)
+
+        # Count repeated outer tile shapes to reduce work.
+        shape_counts = {}
+        for mi in range(outer_m):
+            tm = dim_size(mi, l2_tile_m, m)
+            if tm <= 0:
+                continue
+            for ni in range(outer_n):
+                tn = dim_size(ni, l2_tile_n, n)
+                if tn <= 0:
+                    continue
+                for ki in range(outer_k):
+                    tk = dim_size(ki, l2_tile_k, k)
+                    if tk <= 0:
+                        continue
+                    shape_counts[(tm, tn, tk)] = shape_counts.get((tm, tn, tk), 0) + 1
+
+        def l2_bytes_for_tile(tile_m: int, tile_n: int, tile_k: int):
+            inner_m = ceil_div(tile_m, l1_tile_m)
+            inner_n = ceil_div(tile_n, l1_tile_n)
+            inner_k = ceil_div(tile_k, l1_tile_k)
+
+            def dsz(idx: int, tile: int, total: int) -> int:
+                start = idx * tile
+                if start >= total:
+                    return 0
+                return min(tile, total - start)
+
+            def mk_sz(bm: int, bk: int) -> int:
+                return dsz(bm, l1_tile_m, tile_m) * dsz(bk, l1_tile_k, tile_k)
+
+            def kn_sz(bk: int, bn: int) -> int:
+                return dsz(bk, l1_tile_k, tile_k) * dsz(bn, l1_tile_n, tile_n)
+
+            def mn_sz(bm: int, bn: int) -> int:
+                return dsz(bm, l1_tile_m, tile_m) * dsz(bn, l1_tile_n, tile_n)
+
+            prev_mk = set()
+            prev_kn = set()
+            prev_mn_read = set()
+            prev_mn_write = set()
+
+            batch = []
+            read_bytes = 0.0
+            write_bytes = 0.0
+            smem_bytes = 0.0
+            reg_bytes = 0.0
+            batch_count = 0
+            active_sum = 0
+
+            for bm, bn, bk in Matmul.generate_tile_loops(inner_m, inner_n, inner_k, mapping.l1_loop_order):
+                # On-core traffic: each L1 tile streams A/B from core SRAM into compute,
+                # and produces/updates C in core SRAM. When bk > 0, C participates in
+                # a reduction/update (vector-unit) and incurs extra read+write.
+                tm = dsz(bm, l1_tile_m, tile_m)
+                tn = dsz(bn, l1_tile_n, tile_n)
+                tk = dsz(bk, l1_tile_k, tile_k)
+                a_e = tm * tk
+                b_e = tk * tn
+                c_e = tm * tn
+
+                smem_bytes += float(a_e + b_e) * float(input_word_size)
+                if bk > 0:
+                    smem_bytes += float(c_e) * float(output_word_size)
+                    reg_bytes += float(2 * c_e) * float(output_word_size)
+                smem_bytes += float(c_e) * float(output_word_size)
+
+                batch.append((bm, bn, bk))
+                is_last = bm == inner_m - 1 and bn == inner_n - 1 and bk == inner_k - 1
+                if not is_last and len(batch) < core_count:
+                    continue
+
+                current_mk = {(x_m, x_k) for (x_m, _x_n, x_k) in batch}
+                current_kn = {(x_k, x_n) for (_x_m, x_n, x_k) in batch}
+                current_mn_read = {(x_m, x_n) for (x_m, x_n, x_k) in batch if x_k > 0}
+                current_mn_write = {(x_m, x_n) for (x_m, x_n, _x_k) in batch}
+
+                mk_new = current_mk - prev_mk
+                kn_new = current_kn - prev_kn
+                mn_new = current_mn_read - (prev_mn_read | prev_mn_write)
+                mk_e = sum(mk_sz(x_m, x_k) for (x_m, x_k) in mk_new)
+                kn_e = sum(kn_sz(x_k, x_n) for (x_k, x_n) in kn_new)
+                mn_e = sum(mn_sz(x_m, x_n) for (x_m, x_n) in mn_new)
+
+                mn_write_prev = prev_mn_write - current_mn_read
+                mn_w_e = sum(mn_sz(x_m, x_n) for (x_m, x_n) in mn_write_prev)
+
+                read_bytes += float(mk_e + kn_e + mn_e) * float(input_word_size)
+                write_bytes += float(mn_w_e) * float(output_word_size)
+
+                batch_count += 1
+                active_sum += min(len(batch), core_count)
+
+                prev_mk = current_mk
+                prev_kn = current_kn
+                prev_mn_read = current_mn_read
+                prev_mn_write = current_mn_write
+                batch = []
+
+            if prev_mn_write:
+                mn_w_last = sum(mn_sz(x_m, x_n) for (x_m, x_n) in prev_mn_write)
+                write_bytes += float(mn_w_last) * float(output_word_size)
+
+            total_ctas = inner_m * inner_n * inner_k
+            total_out_tiles = inner_m * inner_n
+            return read_bytes, write_bytes, active_sum, batch_count, smem_bytes, reg_bytes, total_ctas, total_out_tiles, inner_k
+
+        l2_read = 0.0
+        l2_write = 0.0
+        smem_total = 0.0
+        reg_total = 0.0
+        total_active = 0.0
+        total_batches = 0.0
+        grid_size = 0.0
+        grid_size_mn = 0.0
+        k_partitions_weighted = 0.0
+        for (tm, tn, tk), cnt in shape_counts.items():
+            r_b, w_b, active_sum, batch_count, sm_b, rg_b, ctas, out_tiles, inner_k = l2_bytes_for_tile(tm, tn, tk)
+            l2_read += r_b * cnt
+            l2_write += w_b * cnt
+            smem_total += sm_b * cnt
+            reg_total += rg_b * cnt
+            total_active += float(active_sum) * cnt
+            total_batches += float(batch_count) * cnt
+            grid_size += float(ctas) * cnt
+            grid_size_mn += float(out_tiles) * cnt
+            # Average K partitions per output tile (weighted by output tile count).
+            k_partitions_weighted += float(inner_k) * float(out_tiles) * cnt
+
+        l2_access = float(l2_read)
+        l2_miss = min(float(dram_read_bytes), l2_access) if l2_access > 0 else 0.0
+        l2_hit = max(l2_access - l2_miss, 0.0)
+        l2_hit_rate = (l2_hit / l2_access) if l2_access > 0 else 0.0
+
+        occupancy = (float(total_active) / float(total_batches * core_count)) if total_batches > 0 else 0.0
+        active_ctas = (float(total_active) / float(total_batches)) if total_batches > 0 else 0.0
+
+        out = super().profile(pcb_module)
+        out["traffic_bytes"]["dram"] = float(dram_read_bytes + dram_write_bytes)
+        l2_bytes = float(l2_read + l2_write)
+        out["traffic_bytes"]["l2"] = l2_bytes
+        # On-core traffic derived from L1/L0 tiles.
+        out["traffic_bytes"]["smem"] = float(smem_total)
+        # LLMCompass doesn't separate HW L1 cache vs shared SRAM; treat them as the same level.
+        out["traffic_bytes"]["l1"] = float(smem_total)
+        out["traffic_bytes"]["reg"] = float(reg_total)
+        out["cache"]["l2_hits"] = float(l2_hit)
+        out["cache"]["l2_accesses"] = float(l2_access)
+        out["cache"]["l2_hit_rate"] = float(l2_hit_rate)
+        # L1 cache is not modeled; expose stable keys with a conservative proxy.
+        out["cache"]["l1_accesses"] = float(smem_total)
+        out["cache"]["l1_hits"] = 0.0
+        out["cache"]["l1_hit_rate"] = 0.0
+        out["parallelism"]["occupancy"] = float(occupancy)
+        out["parallelism"]["active_ctas"] = float(active_ctas)
+        out["parallelism"]["grid_size"] = float(grid_size)
+
+        # Extra interpretability counters specific to matmul-like kernels.
+        # - grid_size_mn: total number of output tiles (mn) across all L2 tiles.
+        # - k_partitions_avg: average split-K partitions per output tile.
+        k_partitions_avg = (k_partitions_weighted / grid_size_mn) if grid_size_mn > 0 else 0.0
+        out["derived"] = {
+            "matmul": {
+                "grid_size_mn": float(grid_size_mn),
+                "k_partitions_avg": float(k_partitions_avg),
+                # Loop order hints for interpreting whether k-partitions are scheduled as slices (k-major)
+                # or interleaved with m/n traversal. These are descriptive strings, not fixed keys.
+                "l1_loop_order": str(getattr(mapping, "l1_loop_order", "") or ""),
+                "l2_loop_order": str(getattr(mapping, "l2_loop_order", "") or ""),
+            }
+        }
+        return out
 
     @staticmethod
     def find_permutations(n):

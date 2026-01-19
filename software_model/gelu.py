@@ -110,17 +110,100 @@ class GeLU(Operator):
         self.latency_on_gpu = statistics.median(latencies)
         return self.latency_on_gpu
 
+    def profile(self, pcb_module: Device):
+        word_size = getattr(getattr(self, "data_type", None), "word_size", None)
+        if not isinstance(word_size, int) or word_size <= 0:
+            word_size = 2
+        m = getattr(self, "M", None)
+        try:
+            m = int(m)
+        except (TypeError, ValueError):
+            return super().profile(pcb_module)
+        if m <= 0:
+            return super().profile(pcb_module)
+
+        # Strict streaming model: elementwise kernel reads input once and writes output once.
+        base = float(m * word_size)
+        dram_bytes = 2.0 * base
+        l2_bytes = 2.0 * base
+        l1_bytes = 2.0 * base
+        smem_bytes = 0.0
+        reg_bytes = 0.0
+
+        # Parallelism: derive how many cores are needed to cover the vector lanes.
+        core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", None)
+        vec = getattr(getattr(getattr(pcb_module, "compute_module", None), "core", None), "vector_unit", None)
+        vector_width = getattr(vec, "vector_width", None)
+        vector_count = getattr(vec, "vector_count", None)
+
+        occ = 0.0
+        act_cta = 0.0
+        grid_size = 0.0
+
+        try:
+            core_count = int(core_count)
+        except (TypeError, ValueError):
+            core_count = None
+        if isinstance(core_count, int) and core_count <= 0:
+            core_count = None
+
+        try:
+            vector_width = int(vector_width)
+        except (TypeError, ValueError):
+            vector_width = None
+        if isinstance(vector_width, int) and vector_width <= 0:
+            vector_width = None
+
+        try:
+            vector_count = int(vector_count)
+        except (TypeError, ValueError):
+            vector_count = None
+        if isinstance(vector_count, int) and vector_count <= 0:
+            vector_count = None
+
+        if isinstance(core_count, int) and core_count > 0 and isinstance(vector_width, int) and isinstance(vector_count, int) and vector_width > 0 and vector_count > 0:
+            lanes_per_core = vector_width * vector_count
+            cores_needed = (m + lanes_per_core - 1) // lanes_per_core
+            active = min(int(cores_needed), int(core_count))
+            occ = float(active) / float(core_count)
+            act_cta = float(active)
+            grid_size = float(int(cores_needed))
+
+        out = super().profile(pcb_module)
+        out["traffic_bytes"]["dram"] = dram_bytes
+        out["traffic_bytes"]["l2"] = l2_bytes
+        out["traffic_bytes"]["l1"] = l1_bytes
+        out["traffic_bytes"]["smem"] = smem_bytes
+        out["traffic_bytes"]["reg"] = reg_bytes
+
+        l2_access = float(l2_bytes)
+        l2_miss = min(float(dram_bytes), l2_access)
+        l2_hit = l2_access - l2_miss
+        out["cache"]["l2_accesses"] = l2_access
+        out["cache"]["l2_hits"] = l2_hit
+        out["cache"]["l2_hit_rate"] = (l2_hit / l2_access) if l2_access > 0 else 0.0
+
+        l1_access = float(l1_bytes)
+        l1_miss = min(float(l2_bytes), l1_access)
+        l1_hit = l1_access - l1_miss
+        out["cache"]["l1_accesses"] = l1_access
+        out["cache"]["l1_hits"] = l1_hit
+        out["cache"]["l1_hit_rate"] = (l1_hit / l1_access) if l1_access > 0 else 0.0
+
+        out["parallelism"]["occupancy"] = occ
+        out["parallelism"]["active_ctas"] = act_cta
+        out["parallelism"]["grid_size"] = grid_size
+        return out
+
     @staticmethod
     def gpu_kernel_launch_overhead():
-        import torch
-
-        size = 1
+        tensor_size = 1
         latencies = []
         for _ in range(50):
-            a = torch.randn(size, size, device="cuda")
+            a = torch.randn(tensor_size, tensor_size, device="cuda")
             torch.cuda.synchronize()
             start = time.time()
-            c = gelu_gpu(a)
+            _ = gelu_gpu(a)
             torch.cuda.synchronize()
             end = time.time()
             latencies.append(end - start)

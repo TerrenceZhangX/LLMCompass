@@ -207,6 +207,24 @@ class BatchedMatmul(Operator):
         out["cache"]["l1_accesses"] = bytes_total
         out["cache"]["l1_hits"] = 0.0
         out["cache"]["l1_hit_rate"] = 0.0
+
+        # Estimate parallelism for streaming batched matmul.
+        core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", 0)
+        if not isinstance(core_count, int) or core_count <= 0:
+            core_count = 1
+
+        # Grid size = output elements / threads_per_block.
+        output_elems = bs * m * n
+        threads_per_block = 256
+        grid_size = float(max(1, (output_elems + threads_per_block - 1) // threads_per_block))
+        active_ctas = float(min(grid_size, core_count))
+        occupancy = min(1.0, active_ctas / core_count) if core_count > 0 else 0.0
+
+        out["parallelism"] = {
+            "occupancy": occupancy,
+            "active_ctas": active_ctas,
+            "grid_size": grid_size,
+        }
         return out
 
 
@@ -362,7 +380,39 @@ class Matmul(Operator):
         """
 
         if self.best_mapping is None:
-            return super().profile(pcb_module)
+            # Streaming/GEMV mode: no tiled mapping, but still provide parallelism estimate.
+            base_profile = super().profile(pcb_module)
+
+            # Estimate parallelism for streaming matmul (M=1 or N=1).
+            m = getattr(self, "M", None)
+            n = getattr(self, "N", None)
+            k = getattr(self, "K", None)
+            if all(isinstance(x, int) and x > 0 for x in (m, n, k)):
+                core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", 0)
+                if not isinstance(core_count, int) or core_count <= 0:
+                    core_count = 1
+
+                # Streaming GEMV: typically one output element per thread block.
+                # Grid size = output elements = M * N (typically one of them is 1).
+                output_elems = m * n
+
+                # Use a reasonable block size (e.g., 256 threads).
+                threads_per_block = 256
+                grid_size = float(max(1, (output_elems + threads_per_block - 1) // threads_per_block))
+
+                # Active CTAs = min(grid_size, core_count).
+                active_ctas = float(min(grid_size, core_count))
+
+                # Occupancy = active_ctas / core_count, capped at 1.0.
+                occupancy = min(1.0, active_ctas / core_count) if core_count > 0 else 0.0
+
+                base_profile["parallelism"] = {
+                    "occupancy": occupancy,
+                    "active_ctas": active_ctas,
+                    "grid_size": grid_size,
+                }
+
+            return base_profile
 
         mapping = self.best_mapping
         m = getattr(self, "M", None)

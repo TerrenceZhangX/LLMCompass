@@ -177,15 +177,15 @@ class LayerNorm(Operator):
             m = int(m)
             n = int(n)
         except (TypeError, ValueError):
-            return super().profile(pcb_module)
+            return self._streaming_profile_with_parallelism(pcb_module)
         if m <= 0 or n <= 0:
-            return super().profile(pcb_module)
+            return self._streaming_profile_with_parallelism(pcb_module)
 
         mapping = getattr(self, "best_mapping", None)
         l1_tm = getattr(mapping, "l1_tile_M", None) if mapping is not None else None
         l1_tn = getattr(mapping, "l1_tile_N", None) if mapping is not None else None
         if not (isinstance(l1_tm, int) and isinstance(l1_tn, int) and l1_tm > 0 and l1_tn > 0):
-            return super().profile(pcb_module)
+            return self._streaming_profile_with_parallelism(pcb_module)
 
         base = float(m * n * word_size)
 
@@ -274,6 +274,37 @@ class LayerNorm(Operator):
         out["parallelism"]["active_ctas"] = act_cta
         out["parallelism"]["grid_size"] = grid_size
         return out
+
+    def _streaming_profile_with_parallelism(self, pcb_module: Device):
+        """Streaming profile fallback with parallelism estimate for LayerNorm."""
+        base = super().profile(pcb_module)
+
+        m = getattr(self, "M", None)
+        n = getattr(self, "N", None)
+        try:
+            m = int(m)
+            n = int(n)
+        except (TypeError, ValueError):
+            m = n = 0
+
+        if m > 0 and n > 0:
+            core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", 0)
+            if not isinstance(core_count, int) or core_count <= 0:
+                core_count = 1
+
+            # LayerNorm: typically one row (M dimension) per thread block.
+            threads_per_block = 256
+            grid_size = float(max(1, m))  # One block per row
+            active_ctas = float(min(grid_size, core_count))
+            occupancy = min(1.0, active_ctas / core_count) if core_count > 0 else 0.0
+
+            base["parallelism"] = {
+                "occupancy": occupancy,
+                "active_ctas": active_ctas,
+                "grid_size": grid_size,
+            }
+
+        return base
 
     class L2TileSimulator:
         def __init__(

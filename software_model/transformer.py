@@ -115,9 +115,12 @@ class TransformerBlockInitComputationTP(Operator):
         device = system.device
         interconnect = system.interconnect
 
-        qkv_latency = 3 * (
-            self.Q_proj.roofline_model(device) + device.compute_module.overhead.matmul
-        )
+        # Q/K/V projections are identical, simulate Q_proj and copy latency to K/V
+        q_proj_latency = self.Q_proj.roofline_model(device) + device.compute_module.overhead.matmul
+        self.K_proj.roofline_latency = self.Q_proj.roofline_latency
+        self.V_proj.roofline_latency = self.Q_proj.roofline_latency
+        qkv_latency = 3 * q_proj_latency
+
         q_mul_k_latency = (
             self.Q_mul_K.roofline_model(device) + device.compute_module.overhead.matmul
         )
@@ -155,6 +158,8 @@ class TransformerBlockInitComputationTP(Operator):
             self.layer_norm0.roofline_model(device)
             + device.compute_module.overhead.layernorm
         )
+        # layer_norm1 is identical to layer_norm0, copy latency
+        self.layer_norm1.roofline_latency = self.layer_norm0.roofline_latency
 
         normlization_total_latency = softmax_latency + layernorm_latency * 2
 
@@ -197,10 +202,11 @@ class TransformerBlockInitComputationTP(Operator):
 
         # matmul
         print("simulating qkv")
-        qkv_latency = 3 * (
-            self.Q_proj.compile_and_simulate(device, compile_mode)
-            + device.compute_module.overhead.matmul
-        )
+        q_proj_latency = self.Q_proj.compile_and_simulate(device, compile_mode) + device.compute_module.overhead.matmul
+        # K/V projections are identical to Q, copy latency
+        self.K_proj.latency = self.Q_proj.latency
+        self.V_proj.latency = self.Q_proj.latency
+        qkv_latency = 3 * q_proj_latency
         print("simulating q_mul_k")
         q_mul_k_latency = (
             self.Q_mul_K.compile_and_simulate(device, compile_mode)
@@ -246,6 +252,8 @@ class TransformerBlockInitComputationTP(Operator):
             self.layer_norm0.compile_and_simulate(device, compile_mode)
             + device.compute_module.overhead.layernorm
         )
+        # layer_norm1 is identical to layer_norm0, copy latency
+        self.layer_norm1.latency = self.layer_norm0.latency
 
         normlization_total_latency = softmax_latency + layernorm_latency * 2
 
@@ -471,9 +479,11 @@ class TransformerBlockAutoRegressionTP(Operator):
         device = system.device
         interconnect = system.interconnect
 
-        qkv_latency = 3 * (
-            self.Q_proj.roofline_model(device) + device.compute_module.overhead.matmul
-        )
+        q_proj_latency = self.Q_proj.roofline_model(device) + device.compute_module.overhead.matmul
+        # K/V projections are identical to Q, copy latency
+        self.K_proj.roofline_latency = self.Q_proj.roofline_latency
+        self.V_proj.roofline_latency = self.Q_proj.roofline_latency
+        qkv_latency = 3 * q_proj_latency
         q_mul_k_latency = (
             self.Q_mul_K.roofline_model(device) + device.compute_module.overhead.matmul
         )
@@ -511,6 +521,8 @@ class TransformerBlockAutoRegressionTP(Operator):
             self.layer_norm0.roofline_model(device)
             + device.compute_module.overhead.layernorm
         )
+        # layer_norm1 is identical to layer_norm0, copy latency
+        self.layer_norm1.roofline_latency = self.layer_norm0.roofline_latency
 
         normlization_total_latency = softmax_latency + layernorm_latency * 2
 
@@ -554,10 +566,11 @@ class TransformerBlockAutoRegressionTP(Operator):
 
         # matmul
         # print("simulating qkv")
-        qkv_latency = 3 * (
-            self.Q_proj.compile_and_simulate(pcb, compile_mode)
-            + pcb.compute_module.overhead.matmul
-        )
+        q_proj_latency = self.Q_proj.compile_and_simulate(pcb, compile_mode) + pcb.compute_module.overhead.matmul
+        # K/V projections are identical to Q, copy latency
+        self.K_proj.latency = self.Q_proj.latency
+        self.V_proj.latency = self.Q_proj.latency
+        qkv_latency = 3 * q_proj_latency
         # print("simulating q_mul_k")
         q_mul_k_latency = (
             self.Q_mul_K.compile_and_simulate(pcb, compile_mode)
@@ -602,6 +615,8 @@ class TransformerBlockAutoRegressionTP(Operator):
             self.layer_norm0.compile_and_simulate(pcb, compile_mode)
             + pcb.compute_module.overhead.layernorm
         )
+        # layer_norm1 is identical to layer_norm0, copy latency
+        self.layer_norm1.latency = self.layer_norm0.latency
 
         normlization_total_latency = softmax_latency + layernorm_latency * 2
 

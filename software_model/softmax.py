@@ -332,22 +332,32 @@ class Softmax(Operator):
 
         base = float(m * n * word_size)
 
-        # DRAM<->L2: simulator's L2 tile IO is a full read + full write.
+        # DRAM<->L2: data loaded once from DRAM, written once back.
         dram_bytes = 2.0 * base
+
+        # Softmax execution pattern (3-pass algorithm):
+        #   Pass 1: Compute row-wise max (read all elements)
+        #   Pass 2: Compute exp-sum (read all elements again)
+        #   Pass 3: Normalize (read all elements, write all elements)
+        # Total L2 traffic: 3 reads + 1 write = 4 * base
+        # DRAM only loads once; subsequent reads hit L2 cache.
+        softmax_passes_read = 3.0  # max, exp-sum, normalize reads
+        softmax_passes_write = 1.0  # final write
+        l2_bytes_base = (softmax_passes_read + softmax_passes_write) * base
 
         # Reduction steps per L2 tile: log2(ceil(N/l1_tile_N))
         tiles_n = (n + l1_tn - 1) // l1_tn
         reduction_steps = float(log2(tiles_n)) if tiles_n > 1 else 0.0
 
         # L2<->core bytes:
-        # - Baseline: every element is read once and written once at the L2<->core boundary.
+        # - Baseline: 3 reads + 1 write for softmax's 3-pass execution.
         # - Reduction: match simulator structure per L2 tile:
         #     (ceil(l1_tile_count/core_count) + 1) * reduction_steps * reduction_cycle_count
         #   and reduction_cycle_count's bandwidth term corresponds to:
         #     2 * (l1_tile_M*l1_tile_N*word_size) bytes per reduction step.
         core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", None)
         l2_tm = getattr(mapping, "l2_tile_M", None)
-        l2_bytes = 2.0 * base
+        l2_bytes = l2_bytes_base
         occ = 0.0
         act_cta = 0.0
         grid_size = 0.0

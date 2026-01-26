@@ -195,6 +195,7 @@ class BatchedMatmul(Operator):
             return base
 
         # Fallback: algorithmic global-memory bytes (still strict/non-null).
+        # NOTE: This path has no tile model, so L1 metrics are estimated (not precise).
         elem_io = bs * (m * k + k * n + m * n)
         bytes_total = float(elem_io) * float(word_size)
         out = super().profile(pcb_module)
@@ -204,14 +205,10 @@ class BatchedMatmul(Operator):
         out["cache"]["l2_accesses"] = bytes_total
         out["cache"]["l2_hits"] = 0.0
         out["cache"]["l2_hit_rate"] = 0.0
-        # Estimate L1 hit rate for fallback: assume naive matmul without tiling
-        # For naive matmul, data reuse is limited, but still some due to spatial locality
-        # Each output element needs M*K + K*N reads, but we have M*N outputs
-        # Algorithmic accesses = 2 * M * N * K (each MAC reads 2 elements)
+        # L1 fallback estimate: without tile model, use algorithmic access pattern.
+        # This is an approximation; the main Matmul.profile() uses precise tile traversal.
         total_macs = float(bs * m * n * k)
         l1_access_bytes = 2.0 * total_macs * float(word_size)
-        # Without tiling info, assume moderate reuse (estimate ~50% hit rate for typical workloads)
-        # This is conservative; real tiled implementations would be higher
         l1_hits_bytes = max(0.0, l1_access_bytes - bytes_total)
         l1_hit_rate = (l1_hits_bytes / l1_access_bytes) if l1_access_bytes > 0 else 0.0
         out["cache"]["l1_accesses"] = l1_access_bytes
@@ -560,6 +557,14 @@ class Matmul(Operator):
             reg_bytes = 0.0
             batch_count = 0
             active_sum = 0
+            # L1 (SRAM) access tracking: compute unit reads from SRAM to feed systolic array.
+            # For each L1 tile, the systolic array performs tm*tn*tk MACs.
+            # Each MAC logically reads one A element and one B element.
+            # The actual SRAM read pattern depends on dataflow (OS/WS/IS), but we can
+            # precisely track: A tile loaded once, read tn times (broadcast to columns);
+            # B tile loaded once, read tm times (broadcast to rows).
+            l1_read_bytes = 0.0  # Total bytes read from SRAM by compute
+            l1_write_bytes = 0.0  # Total bytes written to SRAM by compute (C output)
 
             for bm, bn, bk in Matmul.generate_tile_loops(inner_m, inner_n, inner_k, mapping.l1_loop_order):
                 # On-core traffic: each L1 tile streams A/B from core SRAM into compute,
@@ -577,6 +582,19 @@ class Matmul(Operator):
                     smem_bytes += float(c_e) * float(output_word_size)
                     reg_bytes += float(2 * c_e) * float(output_word_size)
                 smem_bytes += float(c_e) * float(output_word_size)
+
+                # L1 access: systolic array reads A and B from SRAM for compute.
+                # For output-stationary dataflow:
+                # - A[tm,tk] is read once per output column -> read tn times total
+                # - B[tk,tn] is read once per output row -> read tm times total
+                # This captures the data reuse within the systolic array.
+                l1_read_bytes += float(a_e * tn) * float(input_word_size)  # A reuse
+                l1_read_bytes += float(b_e * tm) * float(input_word_size)  # B reuse
+                # C is written once per tile (accumulated in registers, then stored)
+                l1_write_bytes += float(c_e) * float(output_word_size)
+                if bk > 0:
+                    # For k > 0, need to read previous C for accumulation
+                    l1_read_bytes += float(c_e) * float(output_word_size)
 
                 batch.append((bm, bn, bk))
                 is_last = bm == inner_m - 1 and bn == inner_n - 1 and bk == inner_k - 1
@@ -616,7 +634,7 @@ class Matmul(Operator):
 
             total_ctas = inner_m * inner_n * inner_k
             total_out_tiles = inner_m * inner_n
-            return read_bytes, write_bytes, active_sum, batch_count, smem_bytes, reg_bytes, total_ctas, total_out_tiles, inner_k
+            return read_bytes, write_bytes, active_sum, batch_count, smem_bytes, reg_bytes, total_ctas, total_out_tiles, inner_k, l1_read_bytes, l1_write_bytes
 
         l2_read = 0.0
         l2_write = 0.0
@@ -627,8 +645,10 @@ class Matmul(Operator):
         grid_size = 0.0
         grid_size_mn = 0.0
         k_partitions_weighted = 0.0
+        l1_read_total = 0.0
+        l1_write_total = 0.0
         for (tm, tn, tk), cnt in shape_counts.items():
-            r_b, w_b, active_sum, batch_count, sm_b, rg_b, ctas, out_tiles, inner_k = l2_bytes_for_tile(tm, tn, tk)
+            r_b, w_b, active_sum, batch_count, sm_b, rg_b, ctas, out_tiles, inner_k, l1_r, l1_w = l2_bytes_for_tile(tm, tn, tk)
             l2_read += r_b * cnt
             l2_write += w_b * cnt
             smem_total += sm_b * cnt
@@ -637,6 +657,8 @@ class Matmul(Operator):
             total_batches += float(batch_count) * cnt
             grid_size += float(ctas) * cnt
             grid_size_mn += float(out_tiles) * cnt
+            l1_read_total += l1_r * cnt
+            l1_write_total += l1_w * cnt
             # Average K partitions per output tile (weighted by output tile count).
             k_partitions_weighted += float(inner_k) * float(out_tiles) * cnt
 
@@ -660,17 +682,17 @@ class Matmul(Operator):
         out["cache"]["l2_hits"] = float(l2_hit)
         out["cache"]["l2_accesses"] = float(l2_access)
         out["cache"]["l2_hit_rate"] = float(l2_hit_rate)
-        # L1 hit rate: Estimate based on data reuse within tiles.
-        # For matmul with tiling, data loaded into SRAM is reused multiple times.
-        # Approximate L1 accesses as the total compute footprint (algorithmic accesses),
-        # while L1 "hits" are accesses served from SRAM after the initial load.
-        # Reuse factor = (2 * M * N * K) / smem_bytes_loaded  (each element accessed once per MAC)
-        total_macs = float(M * N * K)
-        elem_accessed = 2.0 * total_macs  # Each MAC reads A[i,k] and B[k,j]
-        l1_access_bytes = elem_accessed * float(input_word_size)
-        l1_load_bytes = float(smem_total) if smem_total > 0 else l1_access_bytes
-        # Hits = accesses - initial loads (what's served from SRAM after loading)
-        l1_hits_bytes = max(0.0, l1_access_bytes - l1_load_bytes)
+        # L1 (SRAM) access metrics derived from precise tile model traversal.
+        # l1_read_total: bytes read from SRAM by systolic array (includes A/B reuse within tiles)
+        # l1_write_total: bytes written to SRAM (C output tiles)
+        # smem_total: bytes loaded from L2 into SRAM (L1 misses / cold loads)
+        l1_access_bytes = float(l1_read_total + l1_write_total)
+        # L1 hits = accesses served by SRAM (reuse) = total accesses - cold loads from L2
+        # Cold loads = A/B loads from L2 to SRAM (part of smem_total, excluding C writes)
+        # For simplicity: l1_hits = l1_reads - (A+B loads from L2)
+        # smem_total includes A, B loads and C read/writes; extract A+B portion
+        l1_cold_load_bytes = float(smem_total)  # Conservative: all smem traffic is "miss"
+        l1_hits_bytes = max(0.0, l1_access_bytes - l1_cold_load_bytes)
         l1_hit_rate = (l1_hits_bytes / l1_access_bytes) if l1_access_bytes > 0 else 0.0
         out["cache"]["l1_accesses"] = float(l1_access_bytes)
         out["cache"]["l1_hits"] = float(l1_hits_bytes)

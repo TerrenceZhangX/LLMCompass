@@ -1,5 +1,5 @@
 from utils import size
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from hardware_model.device import Device
 from software_model.operators import Operator
 from software_model.utils import Tensor, DataType
@@ -8,6 +8,16 @@ import time
 import statistics
 import numpy as np
 import torch
+
+# Import tile model for precise traversal-based profiling
+try:
+    from software_model.tile_model import (
+        ReductionTraversal, ReductionTree, ReductionType,
+        create_layernorm_traversal,
+    )
+    _HAS_TILE_MODEL = True
+except ImportError:
+    _HAS_TILE_MODEL = False
 
 
 @torch.compile
@@ -273,7 +283,77 @@ class LayerNorm(Operator):
         out["parallelism"]["occupancy"] = occ
         out["parallelism"]["active_ctas"] = act_cta
         out["parallelism"]["grid_size"] = grid_size
+
+        # Add reduction tree analysis for vector core utilization
+        if _HAS_TILE_MODEL:
+            out["reduction"] = self._compute_reduction_tree_metrics(
+                m, n, l1_tm, l1_tn, pcb_module
+            )
+
         return out
+
+    def _compute_reduction_tree_metrics(
+        self, m: int, n: int, l1_tm: int, l1_tn: int, pcb_module: Device
+    ) -> Dict[str, Any]:
+        """Compute detailed reduction tree metrics for vector core utilization."""
+        compute = getattr(pcb_module, "compute_module", None)
+        core = getattr(compute, "core", None) if compute else None
+        vector_unit = getattr(core, "vector_unit", None) if core else None
+        vector_lanes = getattr(vector_unit, "vector_count", 32) if vector_unit else 32
+
+        # LayerNorm has 2 reduction passes (mean and var), 1 element-wise pass (normalize)
+        reduction_passes = [
+            ("row_mean", ReductionType.ROW_MEAN),
+            ("row_var", ReductionType.ROW_VAR),
+        ]
+
+        pass_metrics = []
+        total_util_samples = []
+
+        for pass_name, reduction_type in reduction_passes:
+            # Reduction is over L1 tile's N dimension
+            tree = ReductionTree(
+                reduction_dim=l1_tn,
+                vector_lanes=vector_lanes,
+                reduction_type=reduction_type,
+            )
+
+            util_per_level = tree.utilization_per_level()
+            avg_util = tree.average_utilization
+
+            pass_metrics.append({
+                "pass_name": pass_name,
+                "reduction_dim": l1_tn,
+                "tree_depth": tree.tree_depth,
+                "total_ops": tree.total_ops,
+                "utilization_per_level": util_per_level,
+                "average_utilization": avg_util,
+            })
+
+            # Weight by number of L1 tiles
+            tiles_m = (m + l1_tm - 1) // l1_tm
+            tiles_n = (n + l1_tn - 1) // l1_tn
+            total_l1_tiles = tiles_m * tiles_n
+            total_util_samples.extend([avg_util] * total_l1_tiles)
+
+        # Normalize pass has full utilization (element-wise)
+        tiles_m = (m + l1_tm - 1) // l1_tm
+        tiles_n = (n + l1_tn - 1) // l1_tn
+        total_l1_tiles = tiles_m * tiles_n
+        total_util_samples.extend([1.0] * total_l1_tiles)
+
+        # Overall average vector utilization across all passes
+        overall_avg_util = (
+            sum(total_util_samples) / len(total_util_samples)
+            if total_util_samples else 1.0
+        )
+
+        return {
+            "passes": pass_metrics,
+            "overall_vector_utilization": overall_avg_util,
+            "vector_lanes": vector_lanes,
+            "l1_tile_dims": (l1_tm, l1_tn),
+        }
 
     def _streaming_profile_with_parallelism(self, pcb_module: Device):
         """Streaming profile fallback with parallelism estimate for LayerNorm."""

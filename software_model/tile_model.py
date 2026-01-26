@@ -714,8 +714,8 @@ class ElementwiseTraversal(TileTraversal):
             
             yield TileEvent(
                 pass_id=0,
-                l2_tile_idx=(0,),
-                l1_tile_idx=(tile_idx,),
+                l2_tile_idx=(tile_idx,),  # Each L1 tile is its own L2 tile (no reuse)
+                l1_tile_idx=(0,),         # Single L1 tile within each L2 tile
                 tile_dims=TileDimensions(
                     shape=(actual_size,),
                     index=(tile_idx,),

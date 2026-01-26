@@ -136,6 +136,36 @@ class ReductionTree:
         ops_at_level = max(1, active)
         return float(ops_at_level) / flops_per_cycle
 
+    def to_contract_impl(self, pass_name: str = "reduction") -> Dict[str, Any]:
+        """
+        Convert to Counter Contract v0.2 impl.reduction structure.
+        
+        This provides L2-level detail for bottleneck attribution.
+        Maps to 'ComputeBound' when vector utilization is low.
+        """
+        utils = self.utilization_per_level()
+        avg_util = self.average_utilization
+        
+        # Determine bottleneck attribution
+        # Low vector utilization during reduction indicates compute inefficiency
+        maps_to = None
+        if avg_util < 0.5:
+            maps_to = "ComputeBound"  # Severe underutilization
+        elif avg_util < 0.75:
+            maps_to = "ComputeBound"  # Moderate underutilization
+        
+        return {
+            "pass_name": pass_name,
+            "reduction_type": self.reduction_type.value,
+            "reduction_dim": self.reduction_dim,
+            "vector_lanes": self.vector_lanes,
+            "tree_depth": self.tree_depth,
+            "total_ops": self.total_ops,
+            "utilization_per_level": utils,
+            "average_utilization": avg_util,
+            "maps_to": maps_to,
+        }
+
 
 @dataclass
 class CacheState:
@@ -410,6 +440,105 @@ class TileTraversal(ABC):
                 "total_flops": self.total_flops,
                 "avg_vector_utilization": avg_vector_util,
                 "reduction_tree_samples": len(self.vector_util_samples),
+            },
+        }
+
+    def to_contract_metrics(self, time_total_s: float = 0.0) -> Dict[str, Any]:
+        """
+        Convert TileTraversal profile to Counter Contract v0.2 format.
+        
+        This method produces metrics compatible with the performance counter
+        contract schema, mapping internal fields to the standardized structure.
+        
+        Args:
+            time_total_s: Total execution time in seconds (from simulator).
+                          TileTraversal doesn't model time; this must be provided.
+        
+        Returns:
+            Dict in Counter Contract v0.2 format with L0/L1/L2 metrics.
+        """
+        profile = self._build_profile()
+        
+        # L0: Mandatory fields
+        dram_bytes = profile["traffic_bytes"]["dram"]
+        flop_total = profile["compute"]["total_flops"]
+        
+        # Derived L0 metrics
+        ai = flop_total / dram_bytes if dram_bytes > 0 else 0.0
+        gbps = dram_bytes / time_total_s / 1e9 if time_total_s > 0 else 0.0
+        tflops = flop_total / time_total_s / 1e12 if time_total_s > 0 else 0.0
+        
+        def metric(value, unit: str, method: str = "simulated", confidence: float = 0.8):
+            """Helper to create a metric structure."""
+            return {
+                "value": value,
+                "unit": unit,
+                "method": method,
+                "confidence": confidence,
+                "source": "tile_model",
+            }
+        
+        return {
+            # L0: Mandatory
+            "time": {
+                "total": metric(time_total_s, "s", "simulated"),
+            },
+            "work": {
+                "flop_total": metric(flop_total, "FLOP", "simulated"),
+            },
+            "traffic": {
+                "bytes": {
+                    "total": metric(dram_bytes, "bytes", "derived", 0.9),
+                    "dram": metric(profile["traffic_bytes"]["dram"], "bytes"),
+                    "l2": metric(profile["traffic_bytes"]["l2"], "bytes"),
+                    "l1": metric(profile["traffic_bytes"]["l1"], "bytes"),
+                    "smem": metric(profile["traffic_bytes"]["smem"], "bytes"),
+                    "reg": metric(profile["traffic_bytes"]["reg"], "bytes"),
+                },
+            },
+            # L0 Derived
+            "derived": {
+                "ai_flop_per_byte": metric(ai, "FLOP/byte", "derived"),
+                "effective_gbps": metric(gbps, "GB/s", "derived"),
+                "effective_tflops": metric(tflops, "TFLOP/s", "derived"),
+            },
+            # L1: Cache
+            "cache": {
+                "hits": {
+                    "l2": metric(profile["cache"]["l2_hits"], "count"),
+                    "l1": metric(profile["cache"]["l1_hits"], "count"),
+                },
+                "accesses": {
+                    "l2": metric(profile["cache"]["l2_accesses"], "count"),
+                    "l1": metric(profile["cache"]["l1_accesses"], "count"),
+                },
+                "hit_rate": {
+                    "l2": metric(profile["cache"]["l2_hit_rate"], "ratio", "derived"),
+                    "l1": metric(profile["cache"]["l1_hit_rate"], "ratio", "derived"),
+                },
+            },
+            # L1: Parallelism
+            "parallelism": {
+                "occupancy": metric(profile["parallelism"]["occupancy"], "ratio"),
+                "active_ctas": metric(profile["parallelism"]["active_ctas"], "ctas"),
+                "grid_size": metric(profile["parallelism"]["grid_size"], "ctas"),
+            },
+            # L2: Implementation details (reduction tree)
+            "impl": {
+                "reduction": {
+                    "avg_vector_utilization": metric(
+                        profile["compute"]["avg_vector_utilization"], "ratio"
+                    ),
+                    "tree_samples": metric(
+                        profile["compute"]["reduction_tree_samples"], "count"
+                    ),
+                    "maps_to": "ComputeBound" if profile["compute"]["avg_vector_utilization"] < 0.8 else None,
+                },
+                "tile_model": {
+                    "total_tiles": metric(float(self.total_tiles), "count"),
+                    "total_waves": metric(float(self.total_waves), "count"),
+                    "num_passes": metric(float(self.num_passes()), "count"),
+                },
             },
         }
 

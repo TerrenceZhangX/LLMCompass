@@ -204,9 +204,19 @@ class BatchedMatmul(Operator):
         out["cache"]["l2_accesses"] = bytes_total
         out["cache"]["l2_hits"] = 0.0
         out["cache"]["l2_hit_rate"] = 0.0
-        out["cache"]["l1_accesses"] = bytes_total
-        out["cache"]["l1_hits"] = 0.0
-        out["cache"]["l1_hit_rate"] = 0.0
+        # Estimate L1 hit rate for fallback: assume naive matmul without tiling
+        # For naive matmul, data reuse is limited, but still some due to spatial locality
+        # Each output element needs M*K + K*N reads, but we have M*N outputs
+        # Algorithmic accesses = 2 * M * N * K (each MAC reads 2 elements)
+        total_macs = float(bs * m * n * k)
+        l1_access_bytes = 2.0 * total_macs * float(word_size)
+        # Without tiling info, assume moderate reuse (estimate ~50% hit rate for typical workloads)
+        # This is conservative; real tiled implementations would be higher
+        l1_hits_bytes = max(0.0, l1_access_bytes - bytes_total)
+        l1_hit_rate = (l1_hits_bytes / l1_access_bytes) if l1_access_bytes > 0 else 0.0
+        out["cache"]["l1_accesses"] = l1_access_bytes
+        out["cache"]["l1_hits"] = l1_hits_bytes
+        out["cache"]["l1_hit_rate"] = l1_hit_rate
 
         # Estimate parallelism for streaming batched matmul.
         core_count = getattr(getattr(pcb_module, "compute_module", None), "core_count", 0)
@@ -650,10 +660,21 @@ class Matmul(Operator):
         out["cache"]["l2_hits"] = float(l2_hit)
         out["cache"]["l2_accesses"] = float(l2_access)
         out["cache"]["l2_hit_rate"] = float(l2_hit_rate)
-        # L1 cache is not modeled; expose stable keys with a conservative proxy.
-        out["cache"]["l1_accesses"] = float(smem_total)
-        out["cache"]["l1_hits"] = 0.0
-        out["cache"]["l1_hit_rate"] = 0.0
+        # L1 hit rate: Estimate based on data reuse within tiles.
+        # For matmul with tiling, data loaded into SRAM is reused multiple times.
+        # Approximate L1 accesses as the total compute footprint (algorithmic accesses),
+        # while L1 "hits" are accesses served from SRAM after the initial load.
+        # Reuse factor = (2 * M * N * K) / smem_bytes_loaded  (each element accessed once per MAC)
+        total_macs = float(M * N * K)
+        elem_accessed = 2.0 * total_macs  # Each MAC reads A[i,k] and B[k,j]
+        l1_access_bytes = elem_accessed * float(input_word_size)
+        l1_load_bytes = float(smem_total) if smem_total > 0 else l1_access_bytes
+        # Hits = accesses - initial loads (what's served from SRAM after loading)
+        l1_hits_bytes = max(0.0, l1_access_bytes - l1_load_bytes)
+        l1_hit_rate = (l1_hits_bytes / l1_access_bytes) if l1_access_bytes > 0 else 0.0
+        out["cache"]["l1_accesses"] = float(l1_access_bytes)
+        out["cache"]["l1_hits"] = float(l1_hits_bytes)
+        out["cache"]["l1_hit_rate"] = float(l1_hit_rate)
         out["parallelism"]["occupancy"] = float(occupancy)
         out["parallelism"]["active_ctas"] = float(active_ctas)
         out["parallelism"]["grid_size"] = float(grid_size)

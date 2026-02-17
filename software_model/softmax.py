@@ -120,6 +120,42 @@ class Softmax(Operator):
         self.best_cycle_count = min_cycle_count
         self.best_latency = min_cycle_count / pcb_module.compute_module.clock_freq
         self.latency = self.best_latency
+        # Re-simulate best mapping to capture cycle breakdown
+        if best_mapping is not None:
+            self.simulate(self.computational_graph, best_mapping, pcb_module)
+            # Save original breakdown before sensitivity runs
+            saved_breakdown = dict(self._latency_breakdown)
+            # --- Sensitivity analysis: re-simulate with 2x resources ---
+            cm = pcb_module.compute_module
+            im = pcb_module.io_module
+            base = float(min_cycle_count)
+            # 2x L2 BW
+            orig_l2bw = cm.l2_bandwidth_per_cycle
+            cm.l2_bandwidth_per_cycle = orig_l2bw * 2
+            c2 = self.simulate(self.computational_graph, best_mapping, pcb_module)
+            cm.l2_bandwidth_per_cycle = orig_l2bw
+            # 2x DRAM BW
+            orig_dram = im.bandwidth
+            im.bandwidth = orig_dram * 2
+            c3 = self.simulate(self.computational_graph, best_mapping, pcb_module)
+            im.bandwidth = orig_dram
+            # 2x core count (doubles total vector FLOPS and wave parallelism)
+            orig_cores = cm.core_count
+            orig_vflops = cm.total_vector_flops_per_cycle
+            orig_vf = cm.total_vector_flops
+            cm.core_count = orig_cores * 2
+            cm.total_vector_flops_per_cycle = orig_vflops * 2
+            cm.total_vector_flops = orig_vf * 2
+            c4 = self.simulate(self.computational_graph, best_mapping, pcb_module)
+            cm.core_count = orig_cores
+            cm.total_vector_flops_per_cycle = orig_vflops
+            cm.total_vector_flops = orig_vf
+            # Restore original breakdown from saved copy (avoids extra re-simulate)
+            self._latency_breakdown = saved_breakdown
+            # Store sensitivity (% speedup from 2x resource)
+            self._latency_breakdown['l2_sensitivity_pct'] = (1 - c2 / base) * 100 if base > 0 else 0.0
+            self._latency_breakdown['dram_sensitivity_pct'] = (1 - c3 / base) * 100 if base > 0 else 0.0
+            self._latency_breakdown['compute_sensitivity_pct'] = (1 - c4 / base) * 100 if base > 0 else 0.0
         # self.best_mapping.display()
         return self.latency
 
@@ -167,11 +203,23 @@ class Softmax(Operator):
             )
 
         total_cycle_count = 0
+        _dram = 0.0
+        _l2_io = 0.0
+        _alu = 0.0
         l2_tile_count = ceil(M / l2_tile_M)
         for m in range(l2_tile_count):
             total_cycle_count += l2_tiles[m].read_cycle_count
             total_cycle_count += l2_tiles[m].compute_cycle_count
             total_cycle_count += l2_tiles[m].write_cycle_count
+            _dram += l2_tiles[m].read_cycle_count + l2_tiles[m].write_cycle_count
+            _l2_io += l2_tiles[m]._l2_io_cycles
+            _alu += l2_tiles[m]._alu_cycles
+        self._latency_breakdown = {
+            "dram_cycles": float(_dram),
+            "l2_cycles": float(_l2_io),
+            "compute_cycles": float(_alu),
+            "total_cycles": float(total_cycle_count),
+        }
         return total_cycle_count
 
     class L2TileSimulator:
@@ -232,11 +280,22 @@ class Softmax(Operator):
                 + l1_tile.write_cycle_count
                 + l1_tile.compute_cycle_count
             )
-            total_cycle_count = (
+            red_steps = log2(ceil(N / l1_tile_N))
+            waves_factor = (
                 ceil(l1_tile_count / pcb_module.compute_module.core_count) + 1
-            ) * (
+            )
+            total_cycle_count = waves_factor * (
                 l1_tile_cycle_count
-                + log2(ceil(N / l1_tile_N)) * l1_tile.reduction_cycle_count
+                + red_steps * l1_tile.reduction_cycle_count
+            )
+            # Sub-component breakdown for bottleneck classification
+            self._l2_io_cycles = waves_factor * (
+                l1_tile.read_cycle_count + l1_tile.write_cycle_count
+                + red_steps * l1_tile._reduction_l2_cycles
+            )
+            self._alu_cycles = waves_factor * (
+                l1_tile.compute_cycle_count
+                + red_steps * l1_tile._reduction_compute_cycles
             )
             return total_cycle_count
 
@@ -264,16 +323,21 @@ class Softmax(Operator):
             self.write_cycle_count = self.simulate_l1_tile_io_cycle_count(
                 M, N, data_type, pcb_module
             )
-            self.reduction_cycle_count = (
+            self._reduction_compute_cycles = (
                 M
                 * N
                 * (self.flops_per_exp + 2)
                 / pcb_module.compute_module.core.vector_unit.total_vector_flops_per_cycle
-                + M
+            )
+            self._reduction_l2_cycles = (
+                M
                 * N
                 * data_type.word_size
                 * 2
                 / (pcb_module.compute_module.l2_bandwidth_per_cycle/pcb_module.compute_module.core_count)
+            )
+            self.reduction_cycle_count = (
+                self._reduction_compute_cycles + self._reduction_l2_cycles
             )
 
         def simulate_l1_tile_io_cycle_count(
@@ -450,6 +514,11 @@ class Softmax(Operator):
             out["reduction"] = self._compute_reduction_tree_metrics(
                 m, n, l1_tm, l1_tn, pcb_module
             )
+
+        # Cycle breakdown from simulation
+        breakdown = getattr(self, '_latency_breakdown', None)
+        if breakdown is not None:
+            out["latency_breakdown"] = breakdown
 
         return out
 

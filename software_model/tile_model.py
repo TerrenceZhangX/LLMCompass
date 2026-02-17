@@ -539,8 +539,128 @@ class TileTraversal(ABC):
                     "total_waves": metric(float(self.total_waves), "count"),
                     "num_passes": metric(float(self.num_passes()), "count"),
                 },
+                # NCU-alignable metrics (新增)
+                "memory": {
+                    # Sector efficiency: L2 有效利用率
+                    # NCU 对应: lts__t_sector_op_*_utilization.pct
+                    "sector_efficiency": metric(
+                        1.0 if dram_bytes == 0 else min(1.0, profile["traffic_bytes"]["l2"] / (dram_bytes * 4)),
+                        "ratio"
+                    ),
+                    # Coalescing proxy: 假设完美合并=1.0
+                    # NCU 对应: l1tex__average_t_sectors_per_request_pipe_lsu_mem_global_op_ld.ratio
+                    "coalescing_efficiency": metric(1.0, "ratio"),
+                    # L2 write-back bytes (驱逐)
+                    # NCU 对应: lts__t_sectors_op_write.sum * 32
+                    "l2_writeback_bytes": metric(self.dram_write_bytes, "bytes"),
+                },
+                "parallelism_detail": {
+                    # Waves = ceil(grid_size / active_sms)
+                    # NCU 对应: 可通过 kernel duration / sm_cycles 推导
+                    "waves": metric(float(self.total_waves), "count"),
+                    # Tail effect: 最后一波的 SM 利用率损失
+                    "tail_effect": metric(
+                        1.0 - (float(self.total_tiles % max(1, self.core_count)) / float(max(1, self.core_count)))
+                        if self.total_tiles > 0 else 0.0,
+                        "ratio"
+                    ),
+                    # Theoretical occupancy (根据资源)
+                    # NCU 对应: launch__occupancy_per_sm
+                    "theoretical_occupancy": metric(
+                        min(1.0, float(self.total_tiles) / float(max(1, self.core_count))),
+                        "ratio"
+                    ),
+                },
+            },
+            # NCU Counter 对照表 (用于文档/调试)
+            "ncu_mapping": {
+                "traffic.bytes.dram": "dram__bytes.sum",
+                "traffic.bytes.l2": "lts__t_bytes.sum",
+                "traffic.bytes.l1": "l1tex__t_bytes.sum",
+                "cache.hit_rate.l2": "lts__t_sector_hit_rate.pct",
+                "cache.hit_rate.l1": "l1tex__t_sector_hit_rate.pct",
+                "parallelism.occupancy": "sm__warps_active.avg.pct_of_peak_sustained_active",
+                "parallelism.grid_size": "launch__grid_size",
+                "impl.memory.sector_efficiency": "lts__t_sector_op_read_hit_rate.pct",
+                "impl.memory.coalescing_efficiency": "l1tex__average_t_sectors_per_request_pipe_lsu_mem_global_op_ld.ratio",
             },
         }
+
+    def to_contract_node(
+        self,
+        node_id: str,
+        node_type: str = "kernel",
+        time_total_s: float = 0.0,
+        tags: Optional[Dict[str, str]] = None,
+        parent: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate a complete Contract Node per Counter Contract v0.2.
+        
+        Args:
+            node_id: Unique node identifier (e.g., "phase/prefill/layer_0/softmax")
+            node_type: Node type ("kernel", "layer", "phase", etc.)
+            time_total_s: Total execution time in seconds
+            tags: Optional tags (e.g., {"op_type": "Softmax", "phase": "prefill"})
+            parent: Optional parent node id
+        
+        Returns:
+            Complete Contract Node with id, type, metrics, and optional fields.
+        """
+        node = {
+            "id": node_id,
+            "type": node_type,
+            "metrics": self.to_contract_metrics(time_total_s),
+        }
+        
+        if tags:
+            node["tags"] = tags
+        
+        if parent:
+            node["parent"] = parent
+        
+        return node
+
+
+def create_contract(
+    nodes: List[Dict[str, Any]],
+    backend: str = "LLMCompass",
+    backend_version: str = "tile_model_v1",
+    workload: Optional[Dict[str, Any]] = None,
+    arch: Optional[Dict[str, Any]] = None,
+    artifacts: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Create a complete Counter Contract v0.2 document.
+    
+    Args:
+        nodes: List of contract nodes (from TileTraversal.to_contract_node())
+        backend: Backend name
+        backend_version: Backend version string
+        workload: Workload parameters
+        arch: Architecture parameters (peak values for normalization)
+        artifacts: List of artifact paths (logs, configs, etc.)
+    
+    Returns:
+        Complete Contract document per Counter Contract v0.2 schema.
+    
+    Example:
+        >>> softmax = ReductionTraversal(M=4096, N=768, ...)
+        >>> softmax.execute()
+        >>> node = softmax.to_contract_node("layer_0/softmax", tags={"op_type": "Softmax"})
+        >>> contract = create_contract([node], workload={"batch": 32, "seq": 128})
+    """
+    return {
+        "schema_version": "0.2",
+        "backend": {
+            "name": backend,
+            "version": backend_version,
+        },
+        "workload": workload or {},
+        "arch": arch or {},
+        "artifacts": artifacts or [],
+        "nodes": nodes,
+    }
 
 
 # =============================================================================

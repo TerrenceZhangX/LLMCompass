@@ -88,7 +88,32 @@ class GeLU(Operator):
             / pcb_module.compute_module.clock_freq
         )
 
-        return max(compute_latency, io_latency)
+        # Store cycle breakdown for bottleneck classification
+        freq = pcb_module.compute_module.clock_freq
+        dram_time = total_io_count / pcb_module.io_module.bandwidth
+        l2_time = (
+            total_io_count
+            / pcb_module.compute_module.l2_bandwidth_per_cycle
+            / freq
+        )
+        base_lat = max(compute_latency, io_latency)
+        self._latency_breakdown = {
+            "dram_cycles": float(dram_time * freq),
+            "l2_cycles": float(l2_time * freq),
+            "compute_cycles": float(compute_latency * freq),
+            "total_cycles": float(base_lat * freq),
+        }
+        # Sensitivity analysis (roofline: 2x each resource)
+        dram_2x = total_io_count / (pcb_module.io_module.bandwidth * 2)
+        l2_2x = total_io_count / (pcb_module.compute_module.l2_bandwidth_per_cycle * 2) / freq
+        io_lat_dram2x = dram_2x + l2_time   # halve DRAM time, keep L2
+        io_lat_l22x = dram_time + l2_2x     # halve L2 time, keep DRAM
+        comp_2x = compute_latency / 2
+        self._latency_breakdown['l2_sensitivity_pct'] = (1 - max(compute_latency, io_lat_l22x) / base_lat) * 100 if base_lat > 0 else 0.0
+        self._latency_breakdown['dram_sensitivity_pct'] = (1 - max(compute_latency, io_lat_dram2x) / base_lat) * 100 if base_lat > 0 else 0.0
+        self._latency_breakdown['compute_sensitivity_pct'] = (1 - max(comp_2x, io_latency) / base_lat) * 100 if base_lat > 0 else 0.0
+
+        return base_lat
 
     def run_on_gpu(self):
         assert self.shape is not None
@@ -193,6 +218,12 @@ class GeLU(Operator):
         out["parallelism"]["occupancy"] = occ
         out["parallelism"]["active_ctas"] = act_cta
         out["parallelism"]["grid_size"] = grid_size
+
+        # Cycle breakdown from simulation
+        breakdown = getattr(self, '_latency_breakdown', None)
+        if breakdown is not None:
+            out["latency_breakdown"] = breakdown
+
         return out
 
     @staticmethod

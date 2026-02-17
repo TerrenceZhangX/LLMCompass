@@ -81,11 +81,38 @@ class BatchedMatmul(Operator):
             self._matmul_best_mapping = copy.deepcopy(getattr(matmul1, "best_mapping", None))
             self._matmul_shape = (int(self.M), int(self.N), int(self.K))
             self.latency = float(matmul_latency1)
+            # Propagate cycle breakdown (scale by batch count)
+            bd = getattr(matmul1, '_latency_breakdown', None)
+            if bd is not None:
+                self._latency_breakdown = {}
+                for k, v in bd.items():
+                    if k.endswith('_sensitivity_pct'):
+                        self._latency_breakdown[k] = v  # ratios don't scale
+                    else:
+                        self._latency_breakdown[k] = v * float(self.bs)
         else:
             self._chosen_strategy = "fused_k"
             self._matmul_best_mapping = copy.deepcopy(getattr(matmul2, "best_mapping", None))
             self._matmul_shape = (int(self.M), int(self.N), int(self.K * self.bs))
             self.latency = float(matmul_latency2)
+            # Propagate cycle breakdown + add reduction overhead as DRAM cycles
+            bd = getattr(matmul2, '_latency_breakdown', None)
+            if bd is not None:
+                freq = pcb_module.compute_module.clock_freq
+                red_overhead_cycles = float(
+                    (self.bs - 1) * self.M * self.N * self.data_type.word_size
+                    / pcb_module.io_module.bandwidth * freq
+                )
+                self._latency_breakdown = {
+                    "dram_cycles": bd["dram_cycles"] + red_overhead_cycles,
+                    "l2_cycles": bd["l2_cycles"],
+                    "compute_cycles": bd["compute_cycles"],
+                    "total_cycles": bd["total_cycles"] + red_overhead_cycles,
+                }
+                # Copy sensitivity signals if present
+                for sk in ('l2_sensitivity_pct', 'dram_sensitivity_pct', 'compute_sensitivity_pct'):
+                    if sk in bd:
+                        self._latency_breakdown[sk] = bd[sk]
 
         return self.latency
 
@@ -172,6 +199,10 @@ class BatchedMatmul(Operator):
                         dm["grid_size_mn"] = float(dm["grid_size_mn"]) * scale
                     d["matmul"]["l1_loop_order"] = str(getattr(mapping, "l1_loop_order", ""))
                     d["matmul"]["l2_loop_order"] = str(getattr(mapping, "l2_loop_order", ""))
+                # Propagate cycle breakdown from BatchedMatmul
+                bd = getattr(self, '_latency_breakdown', None)
+                if bd is not None:
+                    base["latency_breakdown"] = bd
                 return base
 
             if strategy == "fused_k":
@@ -189,6 +220,10 @@ class BatchedMatmul(Operator):
                 l1_a = float(base["cache"].get("l1_accesses", 0.0) or 0.0)
                 l1_h = float(base["cache"].get("l1_hits", 0.0) or 0.0)
                 base["cache"]["l1_hit_rate"] = (l1_h / l1_a) if l1_a > 0 else 0.0
+                # Propagate cycle breakdown from BatchedMatmul
+                bd = getattr(self, '_latency_breakdown', None)
+                if bd is not None:
+                    base["latency_breakdown"] = bd
                 return base
 
             # Unknown strategy -> fall back to base matmul-derived profile.
@@ -418,6 +453,11 @@ class Matmul(Operator):
                     "active_ctas": active_ctas,
                     "grid_size": grid_size,
                 }
+
+            # Cycle breakdown from simulation (GEMV path)
+            breakdown = getattr(self, '_latency_breakdown', None)
+            if breakdown is not None:
+                base_profile["latency_breakdown"] = breakdown
 
             return base_profile
 
@@ -715,6 +755,12 @@ class Matmul(Operator):
                 "l2_loop_order": str(getattr(mapping, "l2_loop_order", "") or ""),
             }
         }
+
+        # Cycle breakdown from simulation
+        breakdown = getattr(self, '_latency_breakdown', None)
+        if breakdown is not None:
+            out["latency_breakdown"] = breakdown
+
         return out
 
     @staticmethod
@@ -757,6 +803,26 @@ class Matmul(Operator):
             self.latency = max(
                 compute_latency, io_latency
             )  # + pcb_module.io_module.latency * 2
+            # Store cycle breakdown for bottleneck classification
+            freq = pcb_module.compute_module.clock_freq
+            dram_cyc = float(io_latency * freq)
+            compute_cyc = float(compute_latency * freq)
+            total_cyc = float(self.latency * freq)
+            self._latency_breakdown = {
+                "dram_cycles": dram_cyc,
+                "l2_cycles": 0.0,
+                "compute_cycles": compute_cyc,
+                "total_cycles": total_cyc,
+            }
+            # GEMV sensitivity: simple roofline → 2x resource only helps if it's the bottleneck
+            io_lat_2x = total_io_count / (pcb_module.io_module.bandwidth * 2)
+            comp_lat_2x = compute_latency / 2  # 2x cores
+            base_lat = self.latency
+            self._latency_breakdown['l2_sensitivity_pct'] = 0.0  # no L2 in GEMV
+            lat_dram2x = max(compute_latency, io_lat_2x)
+            self._latency_breakdown['dram_sensitivity_pct'] = (1 - lat_dram2x / base_lat) * 100 if base_lat > 0 else 0.0
+            lat_comp2x = max(comp_lat_2x, io_latency)
+            self._latency_breakdown['compute_sensitivity_pct'] = (1 - lat_comp2x / base_lat) * 100 if base_lat > 0 else 0.0
             return self.latency
         if compile_mode == "exhaustive":
             for l2_tile_M_log2 in range(5, ceil(log2(self.computational_graph.M)) + 1):
@@ -1194,7 +1260,35 @@ class Matmul(Operator):
         self.best_cycle_count = min_cycle_count
         self.best_latency = min_cycle_count / pcb_module.compute_module.clock_freq
         self.latency = self.best_latency
-        # self.best_mapping.display()
+        # Re-simulate best mapping to capture cycle breakdown
+        if best_mapping is not None:
+            self.simulate(
+                self.computational_graph,
+                best_mapping,
+                pcb_module,
+            )
+            # Save original breakdown before sensitivity runs
+            saved_breakdown = dict(self._latency_breakdown)
+            # --- Sensitivity analysis: re-simulate with 2x resources ---
+            cm = pcb_module.compute_module
+            im = pcb_module.io_module
+            base = float(min_cycle_count)
+            # 2x L2 BW
+            orig_l2bw = cm.l2_bandwidth_per_cycle
+            cm.l2_bandwidth_per_cycle = orig_l2bw * 2
+            c2 = self.simulate(self.computational_graph, best_mapping, pcb_module)
+            cm.l2_bandwidth_per_cycle = orig_l2bw
+            # 2x DRAM BW
+            orig_dram = im.bandwidth
+            im.bandwidth = orig_dram * 2
+            c3 = self.simulate(self.computational_graph, best_mapping, pcb_module)
+            im.bandwidth = orig_dram
+            # Restore original breakdown from saved copy (avoids extra re-simulate)
+            self._latency_breakdown = saved_breakdown
+            # Store sensitivity (% speedup from 2x resource)
+            self._latency_breakdown['l2_sensitivity_pct'] = (1 - c2 / base) * 100 if base > 0 else 0.0
+            self._latency_breakdown['dram_sensitivity_pct'] = (1 - c3 / base) * 100 if base > 0 else 0.0
+            self._latency_breakdown['compute_sensitivity_pct'] = 0.0  # matmul: can't simply 2x cores without re-tiling
         return self.latency
 
     def simulate(
@@ -1204,8 +1298,9 @@ class Matmul(Operator):
         pcb_module: Device,
     ) -> int:
         if self.look_up_table is None:
+            _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             self.look_up_table = pd.read_csv(
-                f"./systolic_array_model/look_up_table_{pcb_module.compute_module.core.systolic_array.array_height}_{pcb_module.compute_module.core.systolic_array.array_width}.csv",
+                os.path.join(_base_dir, "systolic_array_model", f"look_up_table_{pcb_module.compute_module.core.systolic_array.array_height}_{pcb_module.compute_module.core.systolic_array.array_width}.csv"),
                 header=None,
                 names=[
                     "M",
@@ -1352,9 +1447,12 @@ class Matmul(Operator):
             )
 
         total_cycle_count = 0
-        total_cycle_count += (
+        _acc_dram_io = 0.0
+        initial_read = (
             l2_tiles[0, 0, 0].M_K_io_cycle_count + l2_tiles[0, 0, 0].K_N_io_cycle_count
         )
+        total_cycle_count += initial_read
+        _acc_dram_io += initial_read
 
         previous_m = 0
         previous_n = 0
@@ -1395,6 +1493,9 @@ class Matmul(Operator):
             else:
                 previous_tile_write_cycle_count = previous_l2_tile.M_N_io_cycle_count
 
+            # Accumulate raw sub-component cycles for breakdown
+            _acc_dram_io += current_tile_read_cycle_count + previous_tile_write_cycle_count
+
             # read current tile, compute previous tile, write previous tile
             if mapping.is_l2_double_buffering:  # pipelined
                 total_cycle_count += (
@@ -1415,17 +1516,31 @@ class Matmul(Operator):
             previous_k = k
 
         # compute and write last tile
-        total_cycle_count += (
-            l2_tiles[-1, -1, -1].M_N_io_cycle_count
-            + l2_tiles[-1, -1, -1].compute_cycle_count
-        )
-
+        last_write = l2_tiles[-1, -1, -1].M_N_io_cycle_count
+        last_compute = l2_tiles[-1, -1, -1].compute_cycle_count
         if previous_k > 0:
-            total_cycle_count += ceil(l2_tiles[-1, -1, -1].K_reduction_cycle_count)
+            last_compute += ceil(l2_tiles[-1, -1, -1].K_reduction_cycle_count)
+        total_cycle_count += last_write + last_compute
+        _acc_dram_io += last_write
 
-        return total_cycle_count #+ ceil(
-        # pcb_module.io_module.latency * 2 * pcb_module.compute_module.clock_freq
-        # )
+        # Accumulate L2↔SRAM IO and systolic cycles from all L2 tiles
+        _acc_l2_io = 0.0
+        _acc_systolic = 0.0
+        for m_i in range(l2_tiles.shape[0]):
+            for n_i in range(l2_tiles.shape[1]):
+                for k_i in range(l2_tiles.shape[2]):
+                    tile = l2_tiles[m_i, n_i, k_i]
+                    _acc_l2_io += getattr(tile, '_l2_io_cycles', 0.0)
+                    _acc_systolic += getattr(tile, '_systolic_cycles', 0.0)
+
+        self._latency_breakdown = {
+            "dram_cycles": float(_acc_dram_io),
+            "l2_cycles": float(_acc_l2_io),
+            "compute_cycles": float(_acc_systolic),
+            "total_cycles": float(total_cycle_count),
+        }
+
+        return total_cycle_count
 
     class L2TileSimulator:
         def __init__(
@@ -1630,6 +1745,9 @@ class Matmul(Operator):
                 [ceil(M / l1_tile_M), ceil(N / l1_tile_N)], dtype=bool
             )
             previous_batch_compute_cycle_count = 0
+            _acc_l2_read = 0.0
+            _acc_l2_write = 0.0
+            _acc_systolic = 0.0
             active_l1_tile_list = []
             for m, n, k in Matmul.generate_tile_loops(
                 ceil(M / l1_tile_M),
@@ -1730,6 +1848,10 @@ class Matmul(Operator):
                     )
                     + prvious_batch_write_cycle_count
                 )
+                # Accumulate raw sub-component cycles
+                _acc_l2_read += current_batch_read_cycle_count
+                _acc_l2_write += prvious_batch_write_cycle_count
+                _acc_systolic += previous_batch_compute_cycle_count
 
                 previous_batch_compute_cycle_count = current_batch_compute_cycle_count
                 previous_batch_Read_M_K = copy.deepcopy(current_batch_Read_M_K)
@@ -1740,12 +1862,17 @@ class Matmul(Operator):
                 active_l1_tile_list = []
 
             # last batch's compute and write
-            total_cycle_count += previous_batch_compute_cycle_count + ceil(
+            last_write = ceil(
                 np.sum(previous_batch_Write_M_N * M_N_tile_size)
                 * data_type.word_size
                 / chiplet_module.compute_module.l2_bandwidth_per_cycle
             )
+            total_cycle_count += previous_batch_compute_cycle_count + last_write
+            _acc_systolic += previous_batch_compute_cycle_count
+            _acc_l2_write += last_write
 
+            self._l2_io_cycles = float(_acc_l2_read + _acc_l2_write)
+            self._systolic_cycles = float(_acc_systolic)
             return total_cycle_count
 
     class L1TileSimulator:

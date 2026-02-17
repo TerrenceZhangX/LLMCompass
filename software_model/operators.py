@@ -90,6 +90,7 @@ class Operator:
                 "active_ctas": 0.0,
                 "grid_size": 0.0,
             },
+            "latency_breakdown": None,
         }
 
     class mapping:

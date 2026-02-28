@@ -1,0 +1,532 @@
+{
+  "core_count": {
+    "prefill_roi": [
+      {
+        "from": 32,
+        "to": 48,
+        "latency_from_ms": 3119.726257021277,
+        "latency_to_ms": 2093.460384680851,
+        "improvement_ms": 1026.265872340426,
+        "improvement_pct": 32.89602316968372,
+        "area_delta_mm2": 72.9953440560144,
+        "roi_ms_per_mm2": 14.059333312449365
+      },
+      {
+        "from": 48,
+        "to": 64,
+        "latency_from_ms": 2093.460384680851,
+        "latency_to_ms": 1591.185043971631,
+        "improvement_ms": 502.2753407092198,
+        "improvement_pct": 23.992588748498907,
+        "area_delta_mm2": 72.9953440560144,
+        "roi_ms_per_mm2": 6.8809229849480396
+      },
+      {
+        "from": 64,
+        "to": 96,
+        "latency_from_ms": 1591.185043971631,
+        "latency_to_ms": 1095.4044293144207,
+        "improvement_ms": 495.78061465721044,
+        "improvement_pct": 31.157948381649668,
+        "area_delta_mm2": 145.9906881120288,
+        "roi_ms_per_mm2": 3.3959742300602316
+      },
+      {
+        "from": 96,
+        "to": 108,
+        "latency_from_ms": 1095.4044293144207,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 110.17346992382443,
+        "improvement_pct": 10.057789340214605,
+        "area_delta_mm2": 54.74650804201087,
+        "roi_ms_per_mm2": 2.0124291733690214
+      },
+      {
+        "from": 108,
+        "to": 128,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 847.5141219858156,
+        "improvement_ms": 137.71683740478068,
+        "improvement_pct": 13.978127269768695,
+        "area_delta_mm2": 91.24418007001793,
+        "roi_ms_per_mm2": 1.5093218800267707
+      },
+      {
+        "from": 128,
+        "to": 160,
+        "latency_from_ms": 847.5141219858156,
+        "latency_to_ms": 698.7799375886525,
+        "improvement_ms": 148.73418439716306,
+        "improvement_pct": 17.54946384240337,
+        "area_delta_mm2": 145.9906881120288,
+        "roi_ms_per_mm2": 1.018792269018069
+      },
+      {
+        "from": 160,
+        "to": 192,
+        "latency_from_ms": 698.7799375886525,
+        "latency_to_ms": 603.385550070922,
+        "improvement_ms": 95.39438751773048,
+        "improvement_pct": 13.651563587660675,
+        "area_delta_mm2": 145.99068811202892,
+        "roi_ms_per_mm2": 0.6534278915414636
+      }
+    ],
+    "decode_roi": [
+      {
+        "from": 32,
+        "to": 48,
+        "latency_from_ms": 58.04382670212765,
+        "latency_to_ms": 58.02687280141844,
+        "improvement_ms": 0.01695390070921121,
+        "improvement_pct": 0.02920879217046823,
+        "area_delta_mm2": 72.9953440560144,
+        "roi_ms_per_mm2": 0.0002322600287519887
+      },
+      {
+        "from": 48,
+        "to": 64,
+        "latency_from_ms": 58.02687280141844,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.003172801418436677,
+        "improvement_pct": 0.00546781390287005,
+        "area_delta_mm2": 72.9953440560144,
+        "roi_ms_per_mm2": 4.346580538070984e-05
+      },
+      {
+        "from": 64,
+        "to": 96,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 145.9906881120288,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 96,
+        "to": 108,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 54.74650804201087,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 108,
+        "to": 128,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 91.24418007001793,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 128,
+        "to": 160,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 145.9906881120288,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 160,
+        "to": 192,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 145.99068811202892,
+        "roi_ms_per_mm2": 0.0
+      }
+    ]
+  },
+  "hbm_channel_count": {
+    "prefill_roi": [
+      {
+        "from": 3,
+        "to": 4,
+        "latency_from_ms": 1041.7258490149725,
+        "latency_to_ms": 1004.8917593905963,
+        "improvement_ms": 36.83408962437613,
+        "improvement_pct": 3.535871713196465,
+        "area_delta_mm2": 16.189802699896177,
+        "roi_ms_per_mm2": 2.2751413533045923
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "latency_from_ms": 1004.8917593905963,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 19.66080000000011,
+        "improvement_pct": 1.9565092276130462,
+        "area_delta_mm2": 16.189802699896177,
+        "roi_ms_per_mm2": 1.2143940457116373
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 972.1237593905963,
+        "improvement_ms": 13.10719999999992,
+        "improvement_pct": 1.3303682629002274,
+        "area_delta_mm2": 16.189802699896177,
+        "roi_ms_per_mm2": 0.8095960304744155
+      },
+      {
+        "from": 6,
+        "to": 8,
+        "latency_from_ms": 972.1237593905963,
+        "latency_to_ms": 955.7397593905964,
+        "improvement_ms": 16.3839999999999,
+        "improvement_pct": 1.6853821174240904,
+        "area_delta_mm2": 32.37960539979224,
+        "roi_ms_per_mm2": 0.5059975190465115
+      },
+      {
+        "from": 8,
+        "to": 10,
+        "latency_from_ms": 955.7397593905964,
+        "latency_to_ms": 945.9093593905964,
+        "improvement_ms": 9.830400000000054,
+        "improvement_pct": 1.0285645128196992,
+        "area_delta_mm2": 32.379605399792354,
+        "roi_ms_per_mm2": 0.30359851142790933
+      },
+      {
+        "from": 10,
+        "to": 12,
+        "latency_from_ms": 945.9093593905964,
+        "latency_to_ms": 943.9899309692672,
+        "improvement_ms": 1.919428421329144,
+        "improvement_pct": 0.20291885287674274,
+        "area_delta_mm2": 32.379605399792354,
+        "roi_ms_per_mm2": 0.0592789318347114
+      }
+    ],
+    "decode_roi": [
+      {
+        "from": 3,
+        "to": 4,
+        "latency_from_ms": 79.90616666666666,
+        "latency_to_ms": 66.22962499999998,
+        "improvement_ms": 13.67654166666668,
+        "improvement_pct": 17.115752434626465,
+        "area_delta_mm2": 16.189802699896177,
+        "roi_ms_per_mm2": 0.8447627139245116
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "latency_from_ms": 66.22962499999998,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 8.20592499999998,
+        "improvement_pct": 12.390112430804162,
+        "area_delta_mm2": 16.189802699896177,
+        "roi_ms_per_mm2": 0.5068576283547052
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 52.55308333333333,
+        "improvement_ms": 5.470616666666672,
+        "improvement_pct": 9.428245125124167,
+        "area_delta_mm2": 16.189802699896177,
+        "roi_ms_per_mm2": 0.33790508556980464
+      },
+      {
+        "from": 6,
+        "to": 8,
+        "latency_from_ms": 52.55308333333333,
+        "latency_to_ms": 45.714812499999994,
+        "improvement_ms": 6.83827083333334,
+        "improvement_pct": 13.01212107757713,
+        "area_delta_mm2": 32.37960539979224,
+        "roi_ms_per_mm2": 0.21119067848112863
+      },
+      {
+        "from": 8,
+        "to": 10,
+        "latency_from_ms": 45.714812499999994,
+        "latency_to_ms": 41.611850000000004,
+        "improvement_ms": 4.10296249999999,
+        "improvement_pct": 8.975127044434428,
+        "area_delta_mm2": 32.379605399792354,
+        "roi_ms_per_mm2": 0.1267144070886763
+      },
+      {
+        "from": 10,
+        "to": 12,
+        "latency_from_ms": 41.611850000000004,
+        "latency_to_ms": 38.87880555063042,
+        "improvement_ms": 2.7330444493695865,
+        "improvement_pct": 6.567947470178774,
+        "area_delta_mm2": 32.379605399792354,
+        "roi_ms_per_mm2": 0.08440635442046224
+      }
+    ]
+  },
+  "global_buffer_MB": {
+    "prefill_roi": [
+      {
+        "from": 20,
+        "to": 40,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 47.37752026578073,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 40,
+        "to": 48,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 18.951008106312315,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 48,
+        "to": 60,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 28.426512159468416,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 60,
+        "to": 80,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 47.37752026578073,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 80,
+        "to": 120,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 94.75504053156135,
+        "roi_ms_per_mm2": 0.0
+      }
+    ],
+    "decode_roi": [
+      {
+        "from": 20,
+        "to": 40,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 47.37752026578073,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 40,
+        "to": 48,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 18.951008106312315,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 48,
+        "to": 60,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 28.426512159468416,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 60,
+        "to": 80,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 47.37752026578073,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 80,
+        "to": 120,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 94.75504053156135,
+        "roi_ms_per_mm2": 0.0
+      }
+    ]
+  },
+  "systolic_array_dim": {
+    "prefill_roi": [
+      {
+        "from": 8,
+        "to": 16,
+        "latency_from_ms": 3629.3942375623847,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 2644.1632781717885,
+        "improvement_pct": 72.85412124166737,
+        "area_delta_mm2": 21.828944312337626,
+        "roi_ms_per_mm2": 121.13106526536507
+      },
+      {
+        "from": 16,
+        "to": 32,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 338.96922225374306,
+        "improvement_ms": 646.2617371368532,
+        "improvement_pct": 65.59494816693451,
+        "area_delta_mm2": 87.31577724935016,
+        "roi_ms_per_mm2": 7.401431419333359
+      },
+      {
+        "from": 32,
+        "to": 64,
+        "latency_from_ms": 338.96922225374306,
+        "latency_to_ms": 180.31942556343577,
+        "improvement_ms": 158.64979669030728,
+        "improvement_pct": 46.80359934612187,
+        "area_delta_mm2": 349.26310899740076,
+        "roi_ms_per_mm2": 0.45424149474512054
+      }
+    ],
+    "decode_roi": [
+      {
+        "from": 8,
+        "to": 16,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 21.828944312337626,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 16,
+        "to": 32,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 87.31577724935016,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 32,
+        "to": 64,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 349.26310899740076,
+        "roi_ms_per_mm2": 0.0
+      }
+    ]
+  },
+  "sram_KB": {
+    "prefill_roi": [
+      {
+        "from": 64,
+        "to": 128,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 10.126479050252215,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 128,
+        "to": 192,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 27.55434275838229,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 192,
+        "to": 256,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 18.30024273764252,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 256,
+        "to": 512,
+        "latency_from_ms": 985.2309593905962,
+        "latency_to_ms": 985.2309593905962,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 54.718333767037734,
+        "roi_ms_per_mm2": 0.0
+      }
+    ],
+    "decode_roi": [
+      {
+        "from": 64,
+        "to": 128,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 10.126479050252215,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 128,
+        "to": 192,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 27.55434275838229,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 192,
+        "to": 256,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 18.30024273764252,
+        "roi_ms_per_mm2": 0.0
+      },
+      {
+        "from": 256,
+        "to": 512,
+        "latency_from_ms": 58.023700000000005,
+        "latency_to_ms": 58.023700000000005,
+        "improvement_ms": 0.0,
+        "improvement_pct": 0.0,
+        "area_delta_mm2": 54.718333767037734,
+        "roi_ms_per_mm2": 0.0
+      }
+    ]
+  }
+}

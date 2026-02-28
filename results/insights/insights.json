@@ -3,12 +3,12 @@
     "id": "BTN-001",
     "title": "The Prefill-Decode Duality",
     "category": "bottleneck",
-    "description": "Prefill: 0/0 operators compute-bound (0.0%). Decode: 0/0 operators compute-bound (0.0%). Decode is universally memory-bound across all models, batch sizes, and sequence lengths.",
+    "description": "Prefill: 114/348 operators compute-bound (32.8%). Decode: 0/384 operators compute-bound (0.0%). Decode is universally memory-bound across all models, batch sizes, and sequence lengths.",
     "evidence": [
       {
-        "prefill_compute_pct": 0.0,
+        "prefill_compute_pct": 32.8,
         "decode_compute_pct": 0.0,
-        "total_ops_analyzed": 0
+        "total_ops_analyzed": 732
       }
     ],
     "impact": "high",
@@ -18,10 +18,15 @@
     "id": "BTN-002",
     "title": "Operator Bottleneck Invariants",
     "category": "bottleneck",
-    "description": "Only 0 operators ever become compute-bound: . These are exclusively FFN matmuls. Attention operators (q_mul_k, a_mul_v) and all vector ops are always memory-bound.",
+    "description": "Only 4 operators ever become compute-bound: h_matmul0, h_matmul1, h_matmul2, qkv_proj. These are exclusively FFN matmuls. Attention operators (q_mul_k, a_mul_v) and all vector ops are always memory-bound.",
     "evidence": [
       {
-        "always_compute_ops": []
+        "always_compute_ops": [
+          "h_matmul0",
+          "h_matmul1",
+          "h_matmul2",
+          "qkv_proj"
+        ]
       }
     ],
     "impact": "high",
@@ -31,8 +36,29 @@
     "id": "BTN-003",
     "title": "FFN Dominates Total Latency",
     "category": "bottleneck",
-    "description": "Top operators by latency share: . FFN (h_matmul1 + h_matmul2) accounts for ~48% of total latency.",
-    "evidence": [],
+    "description": "Top operators by latency share: h_matmul1 (21.1%), h_matmul2 (21.1%), qkv_proj (16.1%), softmax (9.8%), h_matmul0 (5.4%). FFN (h_matmul1 + h_matmul2) accounts for ~48% of total latency.",
+    "evidence": [
+      {
+        "op": "h_matmul1",
+        "share_pct": 21.1
+      },
+      {
+        "op": "h_matmul2",
+        "share_pct": 21.1
+      },
+      {
+        "op": "qkv_proj",
+        "share_pct": 16.1
+      },
+      {
+        "op": "softmax",
+        "share_pct": 9.8
+      },
+      {
+        "op": "h_matmul0",
+        "share_pct": 5.4
+      }
+    ],
     "impact": "high",
     "recommendation": "Optimize FFN data flow and compute utilization for maximum latency reduction."
   },
@@ -144,6 +170,21 @@
     ],
     "impact": "high",
     "recommendation": "Industry should explore prefill-decode disaggregation at the architecture level."
+  },
+  {
+    "id": "SCALE-001",
+    "title": "Prefill Scales Well, Decode Scales Poorly",
+    "category": "scaling",
+    "description": "Prefill scaling efficiency: 1\u21924 = 76%, 1\u21928 = 69% (good). Decode scaling: severely sub-linear, often worse at 8 devices vs 4.",
+    "evidence": [
+      {
+        "phase": "prefill",
+        "dc4_eff": 0.761,
+        "dc8_eff": 0.693
+      }
+    ],
+    "impact": "high",
+    "recommendation": "For decode-heavy inference, prefer fewer high-bandwidth devices over more devices."
   },
   {
     "id": "AREA-001",

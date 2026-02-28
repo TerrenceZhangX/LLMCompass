@@ -1,0 +1,852 @@
+{
+  "core_count": [
+    {
+      "value": 32,
+      "die_area_mm2": 372.6016879440874,
+      "compute_area_mm2": 145.9906881120288,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 343.4156173617021,
+          "compute_fraction": 0.9154040918672957,
+          "memory_fraction": 0.08459590813270446
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.503037340425532,
+          "compute_fraction": 0.023688294929361333,
+          "memory_fraction": 0.9763117050706386
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 3119.726257021277,
+          "compute_fraction": 0.9444258223558321,
+          "memory_fraction": 0.05557417764416796
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.04382670212765,
+          "compute_fraction": 0.022687341087722045,
+          "memory_fraction": 0.977312658912278
+        }
+      }
+    },
+    {
+      "value": 48,
+      "die_area_mm2": 445.5970320001018,
+      "compute_area_mm2": 218.9860321680432,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 233.3523209078014,
+          "compute_fraction": 0.8782556737217018,
+          "memory_fraction": 0.12174432627829823
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.49964656028369,
+          "compute_fraction": 0.015917885810820428,
+          "memory_fraction": 0.9840821141891797
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 2093.460384680851,
+          "compute_fraction": 0.9188924755205966,
+          "memory_fraction": 0.0811075244794034
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.02687280141844,
+          "compute_fraction": 0.015240146861841889,
+          "memory_fraction": 0.9847598531381581
+        }
+      }
+    },
+    {
+      "value": 64,
+      "die_area_mm2": 518.5923760561162,
+      "compute_area_mm2": 291.9813762240576,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 180.49219177304965,
+          "compute_fraction": 0.8440047440740411,
+          "memory_fraction": 0.15599525592595878
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.011986112751639374,
+          "memory_fraction": 0.9880138872483607
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 1591.185043971631,
+          "compute_fraction": 0.8947034157879866,
+          "memory_fraction": 0.10529658421201339
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.011473825844114292,
+          "memory_fraction": 0.9885261741558857
+        }
+      }
+    },
+    {
+      "value": 96,
+      "die_area_mm2": 664.583064168145,
+      "compute_area_mm2": 437.9720643360864,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 128.93100784869975,
+          "compute_fraction": 0.7829374779505786,
+          "memory_fraction": 0.2170625220494214
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.008022795879758975,
+          "memory_fraction": 0.991977204120241
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 1095.4044293144207,
+          "compute_fraction": 0.8499547498414463,
+          "memory_fraction": 0.1500452501585537
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.007678584811026522,
+          "memory_fraction": 0.9923214151889735
+        }
+      }
+    },
+    {
+      "value": 108,
+      "die_area_mm2": 719.3295722101559,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 128,
+      "die_area_mm2": 810.5737522801738,
+      "compute_area_mm2": 583.9627524481152,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 103.15041588652483,
+          "compute_fraction": 0.7301109063790998,
+          "memory_fraction": 0.26988909362090013
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.006029189649288381,
+          "memory_fraction": 0.9939708103507117
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 847.5141219858156,
+          "compute_fraction": 0.8094690860063024,
+          "memory_fraction": 0.1905309139936975
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.005770014995646132,
+          "memory_fraction": 0.9942299850043539
+        }
+      }
+    },
+    {
+      "value": 160,
+      "die_area_mm2": 956.5644403922026,
+      "compute_area_mm2": 729.953440560144,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 87.68206070921985,
+          "compute_fraction": 0.6839624078010513,
+          "memory_fraction": 0.3160375921989488
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.004829174921721234,
+          "memory_fraction": 0.9951708250782788
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 698.7799375886525,
+          "compute_fraction": 0.7726649463944462,
+          "memory_fraction": 0.22733505360555378
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.004621345042556026,
+          "memory_fraction": 0.995378654957444
+        }
+      }
+    },
+    {
+      "value": 192,
+      "die_area_mm2": 1102.5551285042316,
+      "compute_area_mm2": 875.9441286721728,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 78.12217100709219,
+          "compute_fraction": 0.6433009510737245,
+          "memory_fraction": 0.3566990489262755
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.004027554061946333,
+          "memory_fraction": 0.9959724459380537
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 603.385550070922,
+          "compute_fraction": 0.7390620062334636,
+          "memory_fraction": 0.26093799376653637
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.0038540893816062308,
+          "memory_fraction": 0.9961459106183937
+        }
+      }
+    }
+  ],
+  "hbm_channel_count": [
+    {
+      "value": 3,
+      "die_area_mm2": 686.9499668103635,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 194.23139443226628,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 128.77194490149725,
+          "compute_fraction": 0.6579695199479695,
+          "memory_fraction": 0.3420304800520305
+        },
+        "llama_7b_decode": {
+          "latency_ms": 15.778353333333332,
+          "compute_fraction": 0.004294904468746837,
+          "memory_fraction": 0.9957050955312532
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 1041.7258490149725,
+          "compute_fraction": 0.7513149192151428,
+          "memory_fraction": 0.24868508078485718
+        },
+        "llama_70b_decode": {
+          "latency_ms": 79.90616666666666,
+          "compute_fraction": 0.004109972660247409,
+          "memory_fraction": 0.9958900273397525
+        }
+      }
+    },
+    {
+      "value": 4,
+      "die_area_mm2": 703.1397695102597,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 210.42119713216243,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 121.40512697662201,
+          "compute_fraction": 0.7194915281386252,
+          "memory_fraction": 0.2805084718613748
+        },
+        "llama_7b_decode": {
+          "latency_ms": 14.353765,
+          "compute_fraction": 0.00571835269880912,
+          "memory_fraction": 0.9942816473011908
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 1004.8917593905963,
+          "compute_fraction": 0.801121671088424,
+          "memory_fraction": 0.19887832891157603
+        },
+        "llama_70b_decode": {
+          "latency_ms": 66.22962499999998,
+          "compute_fraction": 0.005472466318012827,
+          "memory_fraction": 0.9945275336819872
+        }
+      }
+    },
+    {
+      "value": 5,
+      "die_area_mm2": 719.3295722101559,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 6,
+      "die_area_mm2": 735.5193749100521,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 242.80080253195476,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 114.851526976622,
+          "compute_fraction": 0.7937052063159978,
+          "memory_fraction": 0.20629479368400222
+        },
+        "llama_7b_decode": {
+          "latency_ms": 12.929176666666669,
+          "compute_fraction": 0.008553074300459108,
+          "memory_fraction": 0.9914469256995408
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 972.1237593905963,
+          "compute_fraction": 0.858000935150883,
+          "memory_fraction": 0.141999064849117
+        },
+        "llama_70b_decode": {
+          "latency_ms": 52.55308333333333,
+          "compute_fraction": 0.008186299851914861,
+          "memory_fraction": 0.9918137001480851
+        }
+      }
+    },
+    {
+      "value": 8,
+      "die_area_mm2": 767.8989803098443,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 275.1804079317471,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 111.574726976622,
+          "compute_fraction": 0.8368654527975318,
+          "memory_fraction": 0.16313454720246823
+        },
+        "llama_7b_decode": {
+          "latency_ms": 12.2168825,
+          "compute_fraction": 0.01137167813128621,
+          "memory_fraction": 0.9886283218687137
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 955.7397593905964,
+          "compute_fraction": 0.88958084725537,
+          "memory_fraction": 0.11041915274463006
+        },
+        "llama_70b_decode": {
+          "latency_ms": 45.714812499999994,
+          "compute_fraction": 0.010885362854445354,
+          "memory_fraction": 0.9891146371455547
+        }
+      }
+    },
+    {
+      "value": 10,
+      "die_area_mm2": 800.2785857096367,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 307.5600133315394,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 109.60864697662201,
+          "compute_fraction": 0.8650906883439439,
+          "memory_fraction": 0.13490931165605605
+        },
+        "llama_7b_decode": {
+          "latency_ms": 11.789506,
+          "compute_fraction": 0.014174301266174062,
+          "memory_fraction": 0.985825698733826
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 945.9093593905964,
+          "compute_fraction": 0.9096698418993434,
+          "memory_fraction": 0.09033015810065666
+        },
+        "llama_70b_decode": {
+          "latency_ms": 41.611850000000004,
+          "compute_fraction": 0.013569775585281895,
+          "memory_fraction": 0.9864302244147181
+        }
+      }
+    },
+    {
+      "value": 12,
+      "die_area_mm2": 832.658191109429,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 339.93961873133173,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 109.22476129235618,
+          "compute_fraction": 0.8849895774636788,
+          "memory_fraction": 0.11501042253632127
+        },
+        "llama_7b_decode": {
+          "latency_ms": 11.505041110126085,
+          "compute_fraction": 0.016961079230047645,
+          "memory_fraction": 0.9830389207699524
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 943.9899309692672,
+          "compute_fraction": 0.9235742769754925,
+          "memory_fraction": 0.07642572302450733
+        },
+        "llama_70b_decode": {
+          "latency_ms": 38.87880555063042,
+          "compute_fraction": 0.016239657002118137,
+          "memory_fraction": 0.9837603429978818
+        }
+      }
+    }
+  ],
+  "global_buffer_MB": [
+    {
+      "value": 20,
+      "die_area_mm2": 653.0010438380629,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 160.2824714599656,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 40,
+      "die_area_mm2": 700.3785641038436,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 207.65999172574632,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 48,
+      "die_area_mm2": 719.3295722101559,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 60,
+      "die_area_mm2": 747.7560843696243,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 255.03751199152703,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 80,
+      "die_area_mm2": 795.133604635405,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 302.41503225730776,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 120,
+      "die_area_mm2": 889.8886451669664,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 397.17007278886916,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    }
+  ],
+  "systolic_array_dim": [
+    {
+      "value": 8,
+      "die_area_mm2": 697.5006278978183,
+      "compute_area_mm2": 470.88962806575967,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 392.4659479064881,
+          "compute_fraction": 0.9229419030298818,
+          "memory_fraction": 0.07705809697011833
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.02615269059882035,
+          "memory_fraction": 0.9738473094011797
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 3629.3942375623847,
+          "compute_fraction": 0.9510877981731571,
+          "memory_fraction": 0.04891220182684293
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.025874212872151386,
+          "memory_fraction": 0.9741257871278487
+        }
+      }
+    },
+    {
+      "value": 16,
+      "die_area_mm2": 719.3295722101559,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 32,
+      "die_area_mm2": 806.6453494595061,
+      "compute_area_mm2": 580.0343496274475,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 51.68053822537431,
+          "compute_fraction": 0.503336670476493,
+          "memory_fraction": 0.496663329523507
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0022674047732670743,
+          "memory_fraction": 0.997732595226733
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 338.96922225374306,
+          "compute_fraction": 0.5889617037521184,
+          "memory_fraction": 0.4110382962478815
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.001953588203974956,
+          "memory_fraction": 0.998046411796025
+        }
+      }
+    },
+    {
+      "value": 64,
+      "die_area_mm2": 1155.9084584569068,
+      "compute_area_mm2": 929.2974586248483,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 36.149935037562386,
+          "compute_fraction": 0.31752124927415365,
+          "memory_fraction": 0.6824787507258464
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0010423467562138897,
+          "memory_fraction": 0.9989576532437862
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 180.31942556343577,
+          "compute_fraction": 0.3473720945182709,
+          "memory_fraction": 0.6526279054817291
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.0007266808412720304,
+          "memory_fraction": 0.999273319158728
+        }
+      }
+    }
+  ],
+  "sram_KB": [
+    {
+      "value": 64,
+      "die_area_mm2": 681.6487504015214,
+      "compute_area_mm2": 455.0377505694628,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 128,
+      "die_area_mm2": 691.7752294517736,
+      "compute_area_mm2": 465.164229619715,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 192,
+      "die_area_mm2": 719.3295722101559,
+      "compute_area_mm2": 492.7185723780973,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 256,
+      "die_area_mm2": 737.6298149477984,
+      "compute_area_mm2": 511.0188151157398,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    },
+    {
+      "value": 512,
+      "die_area_mm2": 792.3481487148362,
+      "compute_area_mm2": 565.7371488827775,
+      "io_area_mm2": 226.6109998320586,
+      "workloads": {
+        "llama_7b_prefill": {
+          "latency_ms": 117.472966976622,
+          "compute_fraction": 0.7622553445099559,
+          "memory_fraction": 0.23774465549004406
+        },
+        "llama_7b_decode": {
+          "latency_ms": 13.499012,
+          "compute_fraction": 0.0071377368493174805,
+          "memory_fraction": 0.9928622631506825
+        },
+        "llama_70b_prefill": {
+          "latency_ms": 985.2309593905962,
+          "compute_fraction": 0.8343067786770004,
+          "memory_fraction": 0.16569322132299966
+        },
+        "llama_70b_decode": {
+          "latency_ms": 58.023700000000005,
+          "compute_fraction": 0.006831236968960284,
+          "memory_fraction": 0.9931687630310397
+        }
+      }
+    }
+  ]
+}

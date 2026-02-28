@@ -1,0 +1,1466 @@
+{
+  "model_scaling": [
+    {
+      "model": "gpt2_small",
+      "phase": "prefill",
+      "latency_ms": 7.512850382978722,
+      "compute_fraction": 0.4468299642025265,
+      "memory_fraction": 0.5531700357974736,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 8.623971631205673e-05,
+          "flop_count": 2415919104,
+          "io_bytes": 7471104,
+          "arithmetic_intensity": 323.36842105263156,
+          "compute_time": 7.746572104018912e-06,
+          "memory_time": 3.648e-06,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 4.7112e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 4.7112e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 2.874657210401891e-05,
+          "flop_count": 2415919104,
+          "io_bytes": 7471104,
+          "arithmetic_intensity": 323.36842105263156,
+          "compute_time": 7.746572104018912e-06,
+          "memory_time": 3.648e-06,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 5.198628841607565e-05,
+          "flop_count": 9663676416,
+          "io_bytes": 20447232,
+          "arithmetic_intensity": 472.61538461538464,
+          "compute_time": 3.098628841607565e-05,
+          "memory_time": 9.984e-06,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 5.198628841607565e-05,
+          "flop_count": 9663676416,
+          "io_bytes": 20447232,
+          "arithmetic_intensity": 472.61538461538464,
+          "compute_time": 3.098628841607565e-05,
+          "memory_time": 9.984e-06,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 0.00015945599999999999,
+          "flop_count": 5637144576,
+          "io_bytes": 301989888,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 7.230133963750985e-05,
+          "memory_time": 0.000147456,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 4.8072e-05,
+          "flop_count": 11010048,
+          "io_bytes": 6291456,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 1.4121355397951142e-07,
+          "memory_time": 3.072e-06,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 4.8072e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 5.7288000000000004e-05,
+          "flop_count": 283115520,
+          "io_bytes": 25165824,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 3.631205673758865e-06,
+          "memory_time": 1.2288e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "gpt2_small",
+      "phase": "decode",
+      "latency_ms": 3.8412635624999996,
+      "compute_fraction": 0.012656100936168422,
+      "memory_fraction": 0.9873438990638317,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 6.386624999999999e-05,
+          "flop_count": 1179648,
+          "io_bytes": 1182720,
+          "arithmetic_intensity": 0.9974025974025974,
+          "compute_time": 3.782505910165484e-09,
+          "memory_time": 5.775e-07,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 2.1780755859375e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 2.1780755859375e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 2.128875e-05,
+          "flop_count": 1179648,
+          "io_bytes": 1182720,
+          "arithmetic_intensity": 0.9974025974025974,
+          "compute_time": 3.782505910165484e-09,
+          "memory_time": 5.775e-07,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 2.2153875e-05,
+          "flop_count": 4718592,
+          "io_bytes": 4726272,
+          "arithmetic_intensity": 0.9983750406239844,
+          "compute_time": 1.5130023640661937e-08,
+          "memory_time": 2.30775e-06,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 2.2153875e-05,
+          "flop_count": 4718592,
+          "io_bytes": 4726272,
+          "arithmetic_intensity": 0.9983750406239844,
+          "compute_time": 1.5130023640661937e-08,
+          "memory_time": 2.30775e-06,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 1.207203515625e-05,
+          "flop_count": 2753856,
+          "io_bytes": 147528,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 3.532062647754137e-08,
+          "memory_time": 7.203515625e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 4.5001500000000006e-05,
+          "flop_count": 5376,
+          "io_bytes": 3072,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 6.895193065405831e-11,
+          "memory_time": 1.5e-09,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 4.5001500000000006e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 4.5006e-05,
+          "flop_count": 138240,
+          "io_bytes": 12288,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 1.7730496453900708e-09,
+          "memory_time": 6e-09,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "llama_7b",
+      "phase": "prefill",
+      "latency_ms": 117.472966976622,
+      "compute_fraction": 0.7622553445099559,
+      "memory_fraction": 0.23774465549004406,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 0.0007240408195429472,
+          "flop_count": 68719476736,
+          "io_bytes": 67108864,
+          "arithmetic_intensity": 1024.0,
+          "compute_time": 0.00022034693984764907,
+          "memory_time": 3.2768e-05,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 0.00013117346992382454,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 0.00013117346992382454,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 0.00024134693984764906,
+          "flop_count": 68719476736,
+          "io_bytes": 67108864,
+          "arithmetic_intensity": 1024.0,
+          "compute_time": 0.00022034693984764907,
+          "memory_time": 3.2768e-05,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 0.0009023877593905962,
+          "flop_count": 274877906944,
+          "io_bytes": 218103808,
+          "arithmetic_intensity": 1260.3076923076924,
+          "compute_time": 0.0008813877593905963,
+          "memory_time": 0.000106496,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 0.0009023877593905962,
+          "flop_count": 274877906944,
+          "io_bytes": 218103808,
+          "arithmetic_intensity": 1260.3076923076924,
+          "compute_time": 0.0008813877593905963,
+          "memory_time": 0.000106496,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 0.000405216,
+          "flop_count": 15032385536,
+          "io_bytes": 805306368,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 0.00019280357236669293,
+          "memory_time": 0.000393216,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 6.138400000000001e-05,
+          "flop_count": 58720256,
+          "io_bytes": 33554432,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 7.531389545573943e-07,
+          "memory_time": 1.6384e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 6.138400000000001e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 0.000110536,
+          "flop_count": 1509949440,
+          "io_bytes": 134217728,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 1.936643026004728e-05,
+          "memory_time": 6.5536e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "llama_7b",
+      "phase": "decode",
+      "latency_ms": 13.499012,
+      "compute_fraction": 0.0071377368493174805,
+      "memory_fraction": 0.9928622631506825,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 8.7588e-05,
+          "flop_count": 33554432,
+          "io_bytes": 33570816,
+          "arithmetic_intensity": 0.9995119570522206,
+          "compute_time": 1.075912792224849e-07,
+          "memory_time": 1.6392e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 2.5132015624999998e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 2.5132015624999998e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 2.9196e-05,
+          "flop_count": 33554432,
+          "io_bytes": 33570816,
+          "arithmetic_intensity": 0.9995119570522206,
+          "compute_time": 1.075912792224849e-07,
+          "memory_time": 1.6392e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 5.3778e-05,
+          "flop_count": 134217728,
+          "io_bytes": 134258688,
+          "arithmetic_intensity": 0.9996949173225944,
+          "compute_time": 4.303651168899396e-07,
+          "memory_time": 6.5556e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 5.3778e-05,
+          "flop_count": 134217728,
+          "io_bytes": 134258688,
+          "arithmetic_intensity": 0.9996949173225944,
+          "compute_time": 4.303651168899396e-07,
+          "memory_time": 6.5556e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 1.2192093750000001e-05,
+          "flop_count": 7343616,
+          "io_bytes": 393408,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 9.418833727344365e-08,
+          "memory_time": 1.9209375e-07,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 4.5008e-05,
+          "flop_count": 28672,
+          "io_bytes": 16384,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 3.6774363015497767e-10,
+          "memory_time": 8e-09,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 4.5008e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 4.5032000000000005e-05,
+          "flop_count": 737280,
+          "io_bytes": 65536,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 9.456264775413711e-09,
+          "memory_time": 3.2e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "llama_13b",
+      "phase": "prefill",
+      "latency_ms": 213.45355187811927,
+      "compute_fraction": 0.7887696634708612,
+      "memory_fraction": 0.21123033652913895,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 0.001095876280535855,
+          "flop_count": 107374182400,
+          "io_bytes": 94371840,
+          "arithmetic_intensity": 1137.7777777777778,
+          "compute_time": 0.00034429209351195166,
+          "memory_time": 4.608e-05,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 0.00015871683740478065,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 0.00015871683740478065,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 0.0003652920935119517,
+          "flop_count": 107374182400,
+          "io_bytes": 94371840,
+          "arithmetic_intensity": 1137.7777777777778,
+          "compute_time": 0.00034429209351195166,
+          "memory_time": 4.608e-05,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 0.0013981683740478066,
+          "flop_count": 429496729600,
+          "io_bytes": 314572800,
+          "arithmetic_intensity": 1365.3333333333333,
+          "compute_time": 0.0013771683740478066,
+          "memory_time": 0.0001536,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 0.0013981683740478066,
+          "flop_count": 429496729600,
+          "io_bytes": 314572800,
+          "arithmetic_intensity": 1365.3333333333333,
+          "compute_time": 0.0013771683740478066,
+          "memory_time": 0.0001536,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 0.0005035199999999999,
+          "flop_count": 18790481920,
+          "io_bytes": 1006632960,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 0.00024100446545836617,
+          "memory_time": 0.00049152,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 6.548e-05,
+          "flop_count": 73400320,
+          "io_bytes": 41943040,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 9.414236931967429e-07,
+          "memory_time": 2.048e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 6.548e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 0.00012692,
+          "flop_count": 1887436800,
+          "io_bytes": 167772160,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 2.42080378250591e-05,
+          "memory_time": 8.192e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "llama_13b",
+      "phase": "decode",
+      "latency_ms": 19.17100625,
+      "compute_fraction": 0.007015224179700087,
+      "memory_fraction": 0.9929847758203,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 0.00010141499999999999,
+          "flop_count": 52428800,
+          "io_bytes": 52449280,
+          "arithmetic_intensity": 0.9996095275283092,
+          "compute_time": 1.6811137378513265e-07,
+          "memory_time": 2.561e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 2.6165019531249998e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 2.6165019531249998e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 3.3805e-05,
+          "flop_count": 52428800,
+          "io_bytes": 52449280,
+          "arithmetic_intensity": 0.9996095275283092,
+          "compute_time": 1.6811137378513265e-07,
+          "memory_time": 2.561e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 7.22125e-05,
+          "flop_count": 209715200,
+          "io_bytes": 209766400,
+          "arithmetic_intensity": 0.9997559189650964,
+          "compute_time": 6.724454951405306e-07,
+          "memory_time": 0.000102425,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 7.22125e-05,
+          "flop_count": 209715200,
+          "io_bytes": 209766400,
+          "arithmetic_intensity": 0.9997559189650964,
+          "compute_time": 6.724454951405306e-07,
+          "memory_time": 0.000102425,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 1.22401171875e-05,
+          "flop_count": 9179520,
+          "io_bytes": 491760,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 1.1773542159180458e-07,
+          "memory_time": 2.401171875e-07,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 4.5010000000000004e-05,
+          "flop_count": 35840,
+          "io_bytes": 20480,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 4.596795376937221e-10,
+          "memory_time": 1e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 4.5010000000000004e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 4.504e-05,
+          "flop_count": 921600,
+          "io_bytes": 81920,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 1.1820330969267139e-08,
+          "memory_time": 4e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "llama_70b",
+      "phase": "prefill",
+      "latency_ms": 985.2309593905962,
+      "compute_fraction": 0.8343067786770004,
+      "memory_fraction": 0.16569322132299966,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 0.002707163278171789,
+          "flop_count": 274877906944,
+          "io_bytes": 201326592,
+          "arithmetic_intensity": 1365.3333333333333,
+          "compute_time": 0.0008813877593905963,
+          "memory_time": 9.8304e-05,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 0.00024134693984764906,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 0.00024134693984764906,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 0.0009023877593905962,
+          "flop_count": 274877906944,
+          "io_bytes": 201326592,
+          "arithmetic_intensity": 1365.3333333333333,
+          "compute_time": 0.0008813877593905963,
+          "memory_time": 9.8304e-05,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 0.0035465510375623853,
+          "flop_count": 1099511627776,
+          "io_bytes": 704643072,
+          "arithmetic_intensity": 1560.3809523809523,
+          "compute_time": 0.003525551037562385,
+          "memory_time": 0.000344064,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 0.0035465510375623853,
+          "flop_count": 1099511627776,
+          "io_bytes": 704643072,
+          "arithmetic_intensity": 1560.3809523809523,
+          "compute_time": 0.003525551037562385,
+          "memory_time": 0.000344064,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 0.000798432,
+          "flop_count": 30064771072,
+          "io_bytes": 1610612736,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 0.00038560714473338586,
+          "memory_time": 0.000786432,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 7.7768e-05,
+          "flop_count": 117440512,
+          "io_bytes": 67108864,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 1.5062779091147885e-06,
+          "memory_time": 3.2768e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 7.7768e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 0.00017607200000000002,
+          "flop_count": 3019898880,
+          "io_bytes": 268435456,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 3.873286052009456e-05,
+          "memory_time": 0.000131072,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "llama_70b",
+      "phase": "decode",
+      "latency_ms": 58.023700000000005,
+      "compute_fraction": 0.006831236968960284,
+      "memory_fraction": 0.9931687630310397,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 0.00016132799999999997,
+          "flop_count": 134217728,
+          "io_bytes": 134250496,
+          "arithmetic_intensity": 0.9997559189650964,
+          "compute_time": 4.303651168899396e-07,
+          "memory_time": 6.5552e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 2.926403125e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 2.926403125e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 5.3775999999999995e-05,
+          "flop_count": 134217728,
+          "io_bytes": 134250496,
+          "arithmetic_intensity": 0.9997559189650964,
+          "compute_time": 4.303651168899396e-07,
+          "memory_time": 6.5552e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 0.000152092,
+          "flop_count": 536870912,
+          "io_bytes": 536952832,
+          "arithmetic_intensity": 0.9998474353888872,
+          "compute_time": 1.7214604675597583e-06,
+          "memory_time": 0.000262184,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 0.000152092,
+          "flop_count": 536870912,
+          "io_bytes": 536952832,
+          "arithmetic_intensity": 0.9998474353888872,
+          "compute_time": 1.7214604675597583e-06,
+          "memory_time": 0.000262184,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 1.23841875e-05,
+          "flop_count": 14687232,
+          "io_bytes": 786816,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 1.883766745468873e-07,
+          "memory_time": 3.841875e-07,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 4.5016000000000004e-05,
+          "flop_count": 57344,
+          "io_bytes": 32768,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 7.354872603099553e-10,
+          "memory_time": 1.6e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 4.5016000000000004e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 4.5064e-05,
+          "flop_count": 1474560,
+          "io_bytes": 131072,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 1.8912529550827422e-08,
+          "memory_time": 6.4e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "gpt3_175b",
+      "phase": "prefill",
+      "latency_ms": 2519.8147510165486,
+      "compute_fraction": 0.8632019717575243,
+      "memory_fraction": 0.13679802824247567,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 0.006012367375886524,
+          "flop_count": 618475290624,
+          "io_bytes": 402653184,
+          "arithmetic_intensity": 1536.0,
+          "compute_time": 0.0019831224586288414,
+          "memory_time": 0.000196608,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 0.0003515204097714736,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 0.0003515204097714736,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 0.0020041224586288416,
+          "flop_count": 618475290624,
+          "io_bytes": 402653184,
+          "arithmetic_intensity": 1536.0,
+          "compute_time": 0.0019831224586288414,
+          "memory_time": 0.000196608,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 0.007953489834515366,
+          "flop_count": 2473901162496,
+          "io_bytes": 1459617792,
+          "arithmetic_intensity": 1694.896551724138,
+          "compute_time": 0.007932489834515366,
+          "memory_time": 0.000712704,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 0.007953489834515366,
+          "flop_count": 2473901162496,
+          "io_bytes": 1459617792,
+          "arithmetic_intensity": 1694.896551724138,
+          "compute_time": 0.007932489834515366,
+          "memory_time": 0.000712704,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 0.001191648,
+          "flop_count": 45097156608,
+          "io_bytes": 2415919104,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 0.0005784107171000788,
+          "memory_time": 0.001179648,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 9.4152e-05,
+          "flop_count": 176160768,
+          "io_bytes": 100663296,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 2.2594168636721827e-06,
+          "memory_time": 4.9152e-05,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 9.4152e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 0.000241608,
+          "flop_count": 4529848320,
+          "io_bytes": 402653184,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 5.809929078014184e-05,
+          "memory_time": 0.000196608,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    },
+    {
+      "model": "gpt3_175b",
+      "phase": "decode",
+      "latency_ms": 117.63421200000002,
+      "compute_fraction": 0.006728908528668387,
+      "memory_fraction": 0.9932710914713315,
+      "operators": [
+        {
+          "name": "qkv_proj",
+          "latency": 0.00028421999999999996,
+          "flop_count": 301989888,
+          "io_bytes": 302039040,
+          "arithmetic_intensity": 0.9998372660699756,
+          "compute_time": 9.68321513002364e-07,
+          "memory_time": 0.00014748,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "q_mul_k",
+          "latency": 3.3396046875e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "a_mul_v",
+          "latency": 3.3396046875e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "h_matmul0",
+          "latency": 9.473999999999999e-05,
+          "flop_count": 301989888,
+          "io_bytes": 302039040,
+          "arithmetic_intensity": 0.9998372660699756,
+          "compute_time": 9.68321513002364e-07,
+          "memory_time": 0.00014748,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul1",
+          "latency": 0.00031594200000000005,
+          "flop_count": 1207959552,
+          "io_bytes": 1208082432,
+          "arithmetic_intensity": 0.9998982850865594,
+          "compute_time": 3.873286052009456e-06,
+          "memory_time": 0.000589884,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "h_matmul2",
+          "latency": 0.00031594200000000005,
+          "flop_count": 1207959552,
+          "io_bytes": 1208082432,
+          "arithmetic_intensity": 0.9998982850865594,
+          "compute_time": 3.873286052009456e-06,
+          "memory_time": 0.000589884,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "softmax",
+          "latency": 1.257628125e-05,
+          "flop_count": 22030848,
+          "io_bytes": 1180224,
+          "arithmetic_intensity": 18.666666666666668,
+          "compute_time": 2.8256501182033095e-07,
+          "memory_time": 5.7628125e-07,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm0",
+          "latency": 4.5024e-05,
+          "flop_count": 86016,
+          "io_bytes": 49152,
+          "arithmetic_intensity": 1.75,
+          "compute_time": 1.103230890464933e-09,
+          "memory_time": 2.4e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "layernorm1",
+          "latency": 4.5024e-05,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0.0,
+          "memory_time": 0.0,
+          "bottleneck": "compute_bound"
+        },
+        {
+          "name": "gelu",
+          "latency": 4.5096e-05,
+          "flop_count": 2211840,
+          "io_bytes": 196608,
+          "arithmetic_intensity": 11.25,
+          "compute_time": 2.8368794326241133e-08,
+          "memory_time": 9.6e-08,
+          "bottleneck": "memory_bound"
+        },
+        {
+          "name": "allreduce_mha",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        },
+        {
+          "name": "allreduce_ffn",
+          "latency": 0.0,
+          "flop_count": 0,
+          "io_bytes": 0,
+          "arithmetic_intensity": Infinity,
+          "compute_time": 0,
+          "memory_time": 0.0,
+          "bottleneck": "communication_bound"
+        }
+      ]
+    }
+  ],
+  "batch_size_scaling": [
+    {
+      "batch_size": 1,
+      "phase": "prefill",
+      "latency_ms": 117.472966976622,
+      "compute_fraction": 0.7622553445099559
+    },
+    {
+      "batch_size": 1,
+      "phase": "decode",
+      "latency_ms": 13.499012,
+      "compute_fraction": 0.0071377368493174805
+    },
+    {
+      "batch_size": 2,
+      "phase": "prefill",
+      "latency_ms": 224.86593395324402,
+      "compute_fraction": 0.7824759393613374
+    },
+    {
+      "batch_size": 2,
+      "phase": "decode",
+      "latency_ms": 13.772295999999999,
+      "compute_fraction": 0.014149816168315512
+    },
+    {
+      "batch_size": 4,
+      "phase": "prefill",
+      "latency_ms": 439.65186790648806,
+      "compute_fraction": 0.7929939431773003
+    },
+    {
+      "batch_size": 4,
+      "phase": "decode",
+      "latency_ms": 14.318864,
+      "compute_fraction": 0.0278100455508248
+    },
+    {
+      "batch_size": 8,
+      "phase": "prefill",
+      "latency_ms": 869.2237358129762,
+      "compute_fraction": 0.7983596994536005
+    },
+    {
+      "batch_size": 8,
+      "phase": "decode",
+      "latency_ms": 15.411999999999999,
+      "compute_fraction": 0.05375998371106513
+    },
+    {
+      "batch_size": 16,
+      "phase": "prefill",
+      "latency_ms": 1728.367471625952,
+      "compute_fraction": 0.8010699003843417
+    },
+    {
+      "batch_size": 16,
+      "phase": "decode",
+      "latency_ms": 17.598272000000005,
+      "compute_fraction": 0.1007792308161461
+    },
+    {
+      "batch_size": 32,
+      "phase": "prefill",
+      "latency_ms": 3446.654943251904,
+      "compute_fraction": 0.8024319128447255
+    },
+    {
+      "batch_size": 32,
+      "phase": "decode",
+      "latency_ms": 21.970815999999996,
+      "compute_fraction": 0.17910166287930654
+    },
+    {
+      "batch_size": 64,
+      "phase": "prefill",
+      "latency_ms": 6883.229886503809,
+      "compute_fraction": 0.8031146573654744
+    },
+    {
+      "batch_size": 64,
+      "phase": "decode",
+      "latency_ms": 30.715904000000002,
+      "compute_fraction": 0.292929395501887
+    }
+  ],
+  "seq_len_scaling": [
+    {
+      "seq_len": 128,
+      "phase": "prefill",
+      "latency_ms": 15.663238556343579,
+      "compute_fraction": 0.44023696821031033
+    },
+    {
+      "seq_len": 128,
+      "phase": "decode",
+      "latency_ms": 13.245572000000001,
+      "compute_fraction": 0.006614567689086538
+    },
+    {
+      "seq_len": 256,
+      "phase": "prefill",
+      "latency_ms": 21.377549112687152,
+      "compute_fraction": 0.5908489263977194
+    },
+    {
+      "seq_len": 256,
+      "phase": "decode",
+      "latency_ms": 13.262468000000002,
+      "compute_fraction": 0.006649498539166246
+    },
+    {
+      "seq_len": 512,
+      "phase": "prefill",
+      "latency_ms": 33.24686410506961,
+      "compute_fraction": 0.705073322282788
+    },
+    {
+      "seq_len": 512,
+      "phase": "decode",
+      "latency_ms": 13.296259999999998,
+      "compute_fraction": 0.006719337535823879
+    },
+    {
+      "seq_len": 1024,
+      "phase": "prefill",
+      "latency_ms": 58.86797996952982,
+      "compute_fraction": 0.7629323094385232
+    },
+    {
+      "seq_len": 1024,
+      "phase": "decode",
+      "latency_ms": 13.363844000000002,
+      "compute_fraction": 0.006858924783964763
+    },
+    {
+      "seq_len": 2048,
+      "phase": "prefill",
+      "latency_ms": 117.472966976622,
+      "compute_fraction": 0.7622553445099559
+    },
+    {
+      "seq_len": 2048,
+      "phase": "decode",
+      "latency_ms": 13.499012,
+      "compute_fraction": 0.0071377368493174805
+    },
+    {
+      "seq_len": 4096,
+      "phase": "prefill",
+      "latency_ms": 264.13396210349356,
+      "compute_fraction": 0.7101484075761658
+    },
+    {
+      "seq_len": 4096,
+      "phase": "decode",
+      "latency_ms": 13.769348,
+      "compute_fraction": 0.007693915640204726
+    },
+    {
+      "seq_len": 8192,
+      "phase": "prefill",
+      "latency_ms": 675.2600368079853,
+      "compute_fraction": 0.6232375933512965
+    },
+    {
+      "seq_len": 8192,
+      "phase": "decode",
+      "latency_ms": 14.310020000000002,
+      "compute_fraction": 0.008800526707415365
+    }
+  ]
+}

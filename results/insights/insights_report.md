@@ -1,6 +1,6 @@
 # Architectural Insights Report — GPU Design for LLM Workloads
 
-**Total insights extracted:** 10
+**Total insights extracted:** 11
 
 ## Summary
 
@@ -14,6 +14,7 @@
 | SENS-003 | HBM Bandwidth is the Only Decode Currency | sensitivity | high |
 | PARETO-001 | 4-Device Superior for Decode, 8-Device for Prefill | tradeoff | high |
 | PARETO-002 | Prefill-Decode Anti-Correlation on Pareto Frontier | tradeoff | high |
+| SCALE-001 | Prefill Scales Well, Decode Scales Poorly | scaling | high |
 | AREA-001 | Some Parameters Have Negative Marginal Returns | tradeoff | medium |
 | AREA-002 | On-Chip Memory: Expensive Dead Weight for LLM Inference | tradeoff | medium |
 
@@ -25,7 +26,7 @@
 
 **Category:** bottleneck | **Impact:** high
 
-Prefill: 0/0 operators compute-bound (0.0%). Decode: 0/0 operators compute-bound (0.0%). Decode is universally memory-bound across all models, batch sizes, and sequence lengths.
+Prefill: 114/348 operators compute-bound (32.8%). Decode: 0/384 operators compute-bound (0.0%). Decode is universally memory-bound across all models, batch sizes, and sequence lengths.
 
 **Recommendation:** Design separate optimization paths for prefill (compute) and decode (memory bandwidth).
 
@@ -35,7 +36,7 @@ Prefill: 0/0 operators compute-bound (0.0%). Decode: 0/0 operators compute-bound
 
 **Category:** bottleneck | **Impact:** high
 
-Only 0 operators ever become compute-bound: . These are exclusively FFN matmuls. Attention operators (q_mul_k, a_mul_v) and all vector ops are always memory-bound.
+Only 4 operators ever become compute-bound: h_matmul0, h_matmul1, h_matmul2, qkv_proj. These are exclusively FFN matmuls. Attention operators (q_mul_k, a_mul_v) and all vector ops are always memory-bound.
 
 **Recommendation:** Focus compute optimization (systolic arrays) on FFN path; attention needs bandwidth.
 
@@ -45,7 +46,7 @@ Only 0 operators ever become compute-bound: . These are exclusively FFN matmuls.
 
 **Category:** bottleneck | **Impact:** high
 
-Top operators by latency share: . FFN (h_matmul1 + h_matmul2) accounts for ~48% of total latency.
+Top operators by latency share: h_matmul1 (21.1%), h_matmul2 (21.1%), qkv_proj (16.1%), softmax (9.8%), h_matmul0 (5.4%). FFN (h_matmul1 + h_matmul2) accounts for ~48% of total latency.
 
 **Recommendation:** Optimize FFN data flow and compute utilization for maximum latency reduction.
 
@@ -98,6 +99,16 @@ Pareto frontier device distribution: DC=4: 48 designs, best_prefill=767ms, best_
 Pearson correlation between prefill and decode latency on Pareto frontier: r = -0.294. Designs optimized for prefill tend to sacrifice decode performance and vice versa. No single architecture optimizes both.
 
 **Recommendation:** Industry should explore prefill-decode disaggregation at the architecture level.
+
+---
+
+### SCALE-001: Prefill Scales Well, Decode Scales Poorly
+
+**Category:** scaling | **Impact:** high
+
+Prefill scaling efficiency: 1→4 = 76%, 1→8 = 69% (good). Decode scaling: severely sub-linear, often worse at 8 devices vs 4.
+
+**Recommendation:** For decode-heavy inference, prefer fewer high-bandwidth devices over more devices.
 
 ---
 

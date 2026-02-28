@@ -1,0 +1,62 @@
+{
+  "A100": {
+    "modeled_area_mm2": 719.3295722101559,
+    "real_area_mm2": 826,
+    "modeled_tflops": 311.86944,
+    "real_tflops": 312,
+    "modeled_bw_TBs": 2.048,
+    "real_bw_TBs": 2.0,
+    "workloads": {
+      "llama_7b_prefill": {
+        "latency_ms": 117.472966976622,
+        "compute_fraction": 0.7622553445099559
+      },
+      "llama_7b_decode": {
+        "latency_ms": 13.499012,
+        "compute_fraction": 0.0071377368493174805
+      },
+      "llama_70b_prefill": {
+        "latency_ms": 985.2309593905962,
+        "compute_fraction": 0.8343067786770004
+      },
+      "llama_70b_decode": {
+        "latency_ms": 58.023700000000005,
+        "compute_fraction": 0.006831236968960284
+      }
+    }
+  },
+  "H100": {
+    "modeled_area_mm2": 1011.215995071213,
+    "real_area_mm2": 814,
+    "modeled_tflops": 1524.69504,
+    "real_tflops": 989,
+    "modeled_bw_TBs": 3.2768,
+    "real_bw_TBs": 3.35,
+    "workloads": {
+      "llama_7b_prefill": {
+        "latency_ms": 40.166770548033526,
+        "compute_fraction": 0.5702030931851132
+      },
+      "llama_7b_decode": {
+        "latency_ms": 12.2168825,
+        "compute_fraction": 0.002966160189402
+      },
+      "llama_70b_prefill": {
+        "latency_ms": 262.1701054803353,
+        "compute_fraction": 0.6522644289283198
+      },
+      "llama_70b_decode": {
+        "latency_ms": 45.714812499999994,
+        "compute_fraction": 0.0025558812239314483
+      }
+    }
+  },
+  "speedups": {
+    "A100_to_H100": {
+      "llama_7b_prefill": 2.924630618140975,
+      "llama_7b_decode": 1.1049473546135848,
+      "llama_70b_prefill": 3.757983609860873,
+      "llama_70b_decode": 1.2692538113330338
+    }
+  }
+}

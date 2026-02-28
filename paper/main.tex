@@ -290,6 +290,15 @@ communication (\texttt{allreduce}). These operators remain
 memory-bound even during prefill at batch size 64.
 \end{itemize}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/bottleneck_classification}
+\caption{Bottleneck classification by model and phase. Prefill shows a mix of
+compute-bound and memory-bound operators, while decode is universally
+memory-bound across all models.}
+\label{fig:bottleneck}
+\end{figure}
+
 \subsection{Latency Dominance Analysis}
 
 The FFN pathway dominates total latency:
@@ -298,6 +307,15 @@ The FFN pathway dominates total latency:
 18.4\%, bringing the matmul-dominated fraction to 66.6\%. This
 motivates prioritizing systolic array performance over vector unit
 or memory subsystem optimization for prefill workloads.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/operator_breakdown}
+\caption{Operator-level latency breakdown for LLaMA-70B. (a)~Prefill is
+dominated by compute-bound FFN matmuls; (b)~decode is entirely
+memory-bound, with allreduce communication consuming a significant fraction.}
+\label{fig:operator_breakdown}
+\end{figure*}
 
 %% ===========================================================================
 \section{Design Space Exploration Results}
@@ -327,7 +345,16 @@ SRAM (KB)          & 8.1 & 0.2 & 5.0 \\
 \end{tabular}
 \end{table}
 
-Three critical observations emerge:
+Three critical observations emerge (Figure~\ref{fig:sensitivity}):
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/sensitivity_heatmap}
+\caption{Parameter sensitivity heatmap. Systolic array dimension dominates
+prefill (1074.8\%), HBM channels dominate decode (35.2\%), and core count
+drives die area (112.9\%).}
+\label{fig:sensitivity}
+\end{figure}
 
 \paragraph{Systolic array dimension dominates prefill.}
 The systolic array dimension exhibits 1074.8\% range on prefill latency---
@@ -352,6 +379,16 @@ larger L2 increases latency, likely due to higher data movement costs
 in the roofline model. Meanwhile, its decode impact is 0.3\%
 (negligible), yet it consumes 31.7\% of area variation.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/oat_sensitivity}
+\caption{One-at-a-time sensitivity analysis. (a)~SA dimension yields
+quadratic prefill reduction; (b)~HBM channels provide linear decode
+improvement; (c)~Core count shows diminishing returns with negative
+ROI beyond 128 cores.}
+\label{fig:oat}
+\end{figure*}
+
 \subsection{Pareto Frontier Analysis}
 
 Of 5,082 feasible designs, 79 are Pareto-optimal across prefill latency,
@@ -372,10 +409,11 @@ structurally anti-correlated.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/pareto_placeholder}
-\caption{Pareto frontier: prefill vs decode latency, colored by die area.
-Pareto-optimal designs (large markers) span from compute-optimized (left)
-to decode-optimized (right) configurations. See supplementary for full plots.}
+\includegraphics[width=0.95\columnwidth]{figures/pareto_frontier}
+\caption{Pareto frontier: prefill vs decode latency. Pareto-optimal
+designs (colored markers) are partitioned into 4-device (blue, decode-optimized)
+and 8-device (red, prefill-optimized) configurations. Marker size indicates
+die area. Gray background shows all 5,082 feasible designs.}
 \label{fig:pareto}
 \end{figure}
 
@@ -408,6 +446,24 @@ optimization. Furthermore, core counts beyond 128 yield \emph{negative
 returns}---latency increases by 1,397~ms while consuming 94.7~mm$^2$
 additional area.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/area_efficiency}
+\caption{Area efficiency comparison. Systolic array scaling (red) provides
+orders-of-magnitude better ROI per mm$^2$ than core scaling (green) for
+prefill optimization.}
+\label{fig:area_eff}
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/diminishing_returns}
+\caption{ROI diminishing returns. (a)~Prefill ROI drops sharply after
+initial SA/core scaling steps; (b)~Decode ROI is dominated by HBM channels
+with negligible contribution from other parameters.}
+\label{fig:diminishing}
+\end{figure*}
+
 %% ===========================================================================
 \section{Multi-Device Scaling Analysis}
 \label{sec:scaling}
@@ -436,6 +492,15 @@ The culprit is communication overhead: at 8 devices, allreduce consumes
 This has profound implications for inference serving: \textbf{4-device
 clusters are strictly superior to 8-device clusters for decode-heavy
 autoregressive generation.}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/workload_scaling}
+\caption{Workload parameter scaling. (a)~Prefill latency scales linearly
+with batch size while decode remains flat; (b)~Prefill latency scales
+super-linearly with sequence length.}
+\label{fig:workload_scaling}
+\end{figure*}
 
 %% ===========================================================================
 \section{Design Guidelines}

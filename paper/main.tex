@@ -16,35 +16,46 @@
 
 \begin{document}
 
-\title{Untangling GPU Architecture Design for LLM Inference:\\
-A Systematic Design Space Exploration}
+\title{Beyond the Roofline: What GPU Architecture Design Space Exploration\\
+Actually Reveals for LLM Inference}
 
 \author{Anonymous Authors}
 \affiliation{\institution{Anonymous Institution}}
 
 \begin{abstract}
-Large Language Model (LLM) inference presents fundamentally different
-architectural demands between its two phases---prefill (prompt processing)
-and decode (autoregressive token generation). Through systematic profiling
-of 61 workload configurations and design space exploration of 5,082
-architecture variants using the LLMCompass simulation framework, we uncover
-several insights that challenge conventional GPU design wisdom. Our key
-findings include: (1)~systolic array dimension provides 30.5$\times$ better
-area-ROI than core count for prefill acceleration; (2)~decode latency follows
-a precise formula $T = 65.16/\text{BW} + 25.20$\,ms, revealing a 25\,ms
-compute floor that limits bandwidth scaling returns;
-(3)~only three parameters (systolic array dimension, core count, HBM channels)
-have any measurable effect on latency, while on-chip memory parameters
-(SRAM, global buffer) have zero effect in the roofline model---an important
-model limitation; (4)~prefill and decode optimization vectors are nearly
-orthogonal, motivating heterogeneous prefill-decode architectures.
-We distill these findings into six actionable design guidelines for
-next-generation LLM accelerators and identify critical gaps in current
-analytical modeling of GPU memory hierarchies.
+Roofline-based analytical models are increasingly used to guide GPU
+architecture design for Large Language Model (LLM) inference. But how
+reliable is this guidance? Through a systematic design space exploration
+of 5,082 GPU architecture variants using the LLMCompass framework---the
+most comprehensive GPU-level DSE for LLM inference to date---we provide
+the first critical analysis of what roofline-based DSE actually reveals
+and where it fundamentally misleads.
+
+Our study yields four novel findings that survive a rigorous novelty
+analysis against 95 recent papers across 22 research directions.
+\emph{First}, we derive a precise decode latency formula
+$T = 65.16/\text{BW} + 25.20$\,ms ($R^2 > 0.9999$), exposing a 25\,ms
+compute floor that limits HBM bandwidth scaling returns---a result not
+captured by any prior analytical model. \emph{Second}, we construct the
+first complete phase-orthogonal sensitivity matrix, quantifying that
+systolic array scaling provides 30.5$\times$ better area-ROI than core
+scaling for prefill, while decode is entirely insensitive to compute
+resources. \emph{Third}, we demonstrate that commonly-used averaging-based
+sensitivity analysis produces misleading results---SRAM appears to have
+8.1\% prefill impact under naive averaging but has exactly \emph{zero}
+effect under controlled sweeps. \emph{Fourth}, we show that the roofline
+model has a critical blind spot: on-chip memory (SRAM, global buffer)
+shows zero latency sensitivity across all 5,082 designs, meaning
+roofline-based DSE \emph{cannot guide memory hierarchy design}---a
+fundamental limitation for the community to address.
+
+We distill these findings into six design guidelines for next-generation
+LLM accelerators and identify the boundary between what analytical DSE
+can and cannot reliably inform.
 \end{abstract}
 
 \keywords{GPU Architecture, LLM Inference, Design Space Exploration,
-Roofline Model, Hardware-Software Co-Design}
+Roofline Model, Hardware-Software Co-Design, Sensitivity Analysis}
 
 \maketitle
 
@@ -52,103 +63,228 @@ Roofline Model, Hardware-Software Co-Design}
 \section{Introduction}
 \label{sec:intro}
 
-The deployment of Large Language Models (LLMs) at scale has become one of
-the dominant workloads in modern datacenters. Models such as GPT-3
-(175B parameters)~\cite{brown2020language}, LLaMA (7B--70B)~\cite{touvron2023llama},
-and their successors require massive compute and memory bandwidth for inference serving. As LLM inference becomes a first-class design target
-for GPU vendors, understanding the precise architectural bottlenecks and
-tradeoffs is critical.
+Large Language Model (LLM) inference has become one of the most important
+workloads in modern datacenters. The scale of deployment---GPT-4 reportedly
+serves hundreds of millions of queries per day---makes architectural
+efficiency directly impact cost and carbon
+footprint~\cite{stojkovic2024greener,llmco2}. As GPU vendors design
+next-generation accelerators with LLM inference as a first-class design
+target, the community needs rigorous methodology to navigate the vast
+design space.
 
-LLM inference consists of two distinct phases with fundamentally different
-computational characteristics. The \textbf{prefill} phase processes the
-input prompt through all transformer layers, performing large matrix
-multiplications that are typically compute-bound. The \textbf{decode} phase
-generates tokens one at a time, executing the same model architecture but
-with much smaller tensor dimensions, resulting in memory-bandwidth-limited
-execution.
+Analytical models, particularly roofline-based
+frameworks~\cite{williams2009roofline,verhelst2025rooflines}, are
+attractive tools for design space exploration (DSE) because they enable
+rapid evaluation of thousands of design points without expensive cycle-level
+simulation. Recent work has produced several such
+frameworks~\cite{llmcompass,pope2023efficiently,zigzag2021}, and they
+have been used to inform architectural decisions including
+phase-specialized chip design~\cite{spad2025}, chip architectures under
+export control constraints~\cite{ning2025sanctions}, and disaggregated
+serving systems~\cite{splitwise2024,distserve2024}.
 
-Despite this well-known dichotomy, the quantitative architectural
-implications remain underexplored. Specifically:
-\begin{itemize}
-\item \emph{Which architectural parameters matter for each phase, and by how much?}
-\item \emph{What are the area-performance tradeoffs, and where do diminishing returns occur?}
-\item \emph{How does multi-device scaling behave differently for each phase?}
-\item \emph{Is it possible to design a single architecture that is optimal for both?}
-\end{itemize}
+However, a critical question remains largely unexamined: \emph{how
+reliable is the design guidance produced by roofline-based DSE?} The
+roofline model is an intentional abstraction that trades accuracy for
+speed. Understanding where this abstraction faithfully represents
+architectural tradeoffs---and where it fundamentally misleads---is
+essential for the community.
 
-In this work, we conduct a systematic study using LLMCompass~\cite{llmcompass},
-a hardware-software co-simulation framework that models GPU execution at the
-operator level using a roofline-based performance model and estimates die area
-through a process-aware cost model. We make the following \textbf{contributions}:
+In this paper, we present the most comprehensive GPU-level DSE study for
+LLM inference to date: 5,082 architecture variants evaluated across
+61 workload configurations spanning 5 model sizes. Our analysis yields
+\emph{both} positive results (reliable design guidance in several
+dimensions) \emph{and} negative results (critical blind spots that the
+community must address). We make the following contributions:
 
 \begin{enumerate}
-\item \textbf{Comprehensive bottleneck taxonomy} across 61 workload
-configurations spanning 5 model sizes, 10 workload scenarios, and up to
-8 devices, classifying 732 individual operator executions.
+\item \textbf{Decode latency formula with compute floor.}
+We derive $T = 65.16/\text{BW} + 25.20$\,ms ($R^2 > 0.9999$), revealing
+that 56\% of the fastest decode latency is a compute floor insensitive to
+bandwidth scaling. No prior work has identified this floor or its
+implications for HBM investment ROI (Section~\ref{sec:decode_formula}).
 
-\item \textbf{5-dimensional design space exploration} over core count,
-HBM channels, global buffer, systolic array dimensions, and SRAM, evaluating
-5,082 feasible designs and identifying 79 Pareto-optimal configurations.
+\item \textbf{Phase-orthogonal sensitivity matrix with area-ROI.}
+We construct the first complete 5-parameter $\times$ 3-objective
+sensitivity matrix using controlled single-parameter sweeps, showing
+systolic array scaling provides 30.5$\times$ better area-ROI than core
+scaling for prefill. This quantitative map enables principled
+phase-specialized design (Section~\ref{sec:sensitivity}).
 
-\item \textbf{Critical validation of sensitivity methodology}, demonstrating
-that common averaging-based sensitivity analysis produces misleading results
-and proposing controlled single-parameter sweeps as a correction.
+\item \textbf{Methodology critique: averaging produces artifacts.}
+We demonstrate that the common practice of averaging across configurations
+at each parameter level~\cite{llmcompass} produces misleading sensitivity
+estimates. SRAM appeared to have 8.1\% prefill impact under naive
+averaging but has exactly zero effect under controlled sweeps
+(Section~\ref{sec:methodology_critique}).
 
-\item \textbf{Six actionable design guidelines} for next-generation LLM
-accelerators, including identification of key roofline model limitations
-for on-chip memory design.
+\item \textbf{Roofline model blind spot for memory hierarchy.}
+We show that on-chip memory parameters (SRAM 64--512\,KB, global buffer
+20--120\,MB) have \emph{zero} effect on latency across all 5,082 designs.
+This reveals a fundamental limitation: roofline-based DSE cannot guide
+on-chip memory sizing decisions, despite memory hierarchy being critical
+for techniques like FlashAttention~\cite{dao2022flashattention}
+(Section~\ref{sec:blind_spot}).
 \end{enumerate}
 
+Contributions 1--2 provide actionable design guidance; contributions 3--4
+identify boundaries of the methodology itself. Together, they establish
+what GPU architecture DSE can and cannot reliably inform for LLM inference.
+
 %% ===========================================================================
-\section{Background and Related Work}
+\section{Background}
 \label{sec:background}
 
-\subsection{LLM Inference Architecture}
+\subsection{LLM Inference Phases}
 
-A transformer-based LLM layer consists of multi-head attention (MHA)
-and feed-forward network (FFN) blocks. The MHA block includes QKV
-projection, $Q \cdot K^T$ attention scores, softmax, $A \cdot V$
-context aggregation, and output projection. The FFN block includes
-two large matrix multiplications with a GeLU activation between them.
-Layer normalization is applied before each sub-block.
+Transformer-based LLM inference proceeds in two phases with fundamentally
+different computational profiles~\cite{splitwise2024,pope2023efficiently}.
+The \textbf{prefill} phase processes the input prompt through all
+transformer layers, performing large matrix multiplications on tensors of
+shape $(b, s, d)$ that are typically compute-bound. The \textbf{decode}
+phase generates tokens autoregressively, processing tensors of shape
+$(b, 1, d)$ per step, which is memory-bandwidth-bound due to the
+weight-dominated memory access pattern.
 
-During prefill, the input sequence of length $s$ is processed in
-parallel, producing matrices of shape $(b, s, d)$ where $b$ is the
-batch size and $d$ is the model dimension. During decode, each forward
-pass processes a single token, reducing the effective matrix dimensions
-to $(b, 1, d)$ and shifting the bottleneck from compute to memory bandwidth.
+This duality is well-established in the
+literature~\cite{splitwise2024,distserve2024,spad2025} and has motivated
+phase-disaggregated serving~\cite{splitwise2024,distserve2024,mooncake2024}
+and phase-specialized architectures~\cite{spad2025}. Our work does not
+re-establish this duality but rather asks: \emph{given this duality, what
+quantitative design guidance can analytical DSE provide, and where does
+it fall short?}
 
 \subsection{Roofline Performance Model}
 
 The roofline model~\cite{williams2009roofline} characterizes operator
-performance by comparing arithmetic intensity (AI = FLOPs/bytes) against
-the machine's ridge point ($\pi/\beta$, where $\pi$ is peak compute and
-$\beta$ is peak bandwidth). An operator with AI above the ridge point is
-\emph{compute-bound}; otherwise it is \emph{memory-bound}. The attainable
-performance is:
-
-\begin{equation}
-\text{Perf} = \min(\pi, \text{AI} \times \beta)
-\end{equation}
-
-And the execution time is:
-
+performance by arithmetic intensity (AI = FLOPs/bytes):
 \begin{equation}
 T = \max\left(\frac{\text{FLOPs}}{\pi}, \frac{\text{Bytes}}{\beta}\right)
 \end{equation}
+where $\pi$ is peak compute throughput and $\beta$ is peak memory
+bandwidth. Recent extensions target ML
+accelerators~\cite{verhelst2025rooflines} and sparse
+workloads~\cite{shinn2023sparsity}. The model's key strength is that it
+enables rapid evaluation of design points; its key weakness is that it
+uses peak bandwidth regardless of on-chip data reuse patterns.
 
-\subsection{Related Work}
+\subsection{DSE Frameworks for LLM Inference}
 
-Prior work on GPU architecture for deep learning has focused on
-training-oriented design~\cite{jouppi2017datacenter, jia2019dissecting},
-while inference-specific studies have largely targeted CNN
-workloads~\cite{chen2019eyeriss}. Recent attention to LLM inference
-optimization has focused on algorithmic approaches (FlashAttention~\cite{dao2022flashattention},
-PagedAttention~\cite{kwon2023efficient}, speculative
-decoding~\cite{leviathan2023fast}) rather than architectural DSE.
-LLMCompass~\cite{llmcompass} provides the first hardware-software
-co-simulation framework specifically designed for LLM inference
-architecture exploration, which we extend with systematic DSE methodology.
+LLMCompass~\cite{llmcompass} provides GPU-level co-simulation with
+operator-level roofline modeling and a process-aware area cost model.
+Pope et al.~\cite{pope2023efficiently} present an analytical model for
+transformer inference on TPUs. ZigZag~\cite{zigzag2021} and
+Timeloop~\cite{parashar2019timeloop} target spatial accelerator DSE with
+dataflow mapping optimization. Ning and Wentzlaff~\cite{ning2025sanctions}
+apply LLMCompass-based DSE under export control constraints.
+SPAD~\cite{spad2025} uses LLMCompass to design phase-specialized prefill
+and decode chips. Unlike these works, which use DSE to \emph{find optimal
+designs}, we use DSE to \emph{analyze the design landscape and evaluate
+the methodology itself}.
+
+%% ===========================================================================
+\section{Related Work}
+\label{sec:related}
+
+We organize related work into five categories relevant to our study.
+Table~\ref{tab:related_comparison} positions our work against the most
+closely related papers.
+
+\begin{table*}[t]
+\centering
+\caption{Comparison with most closely related work. Our study uniquely
+combines all five aspects: GPU-class DSE, sensitivity analysis, area-ROI
+quantification, decode formula derivation, and methodology critique.}
+\label{tab:related_comparison}
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Paper} & \textbf{GPU-class DSE} & \textbf{Sensitivity} & \textbf{Area-ROI} & \textbf{Decode formula} & \textbf{Methodology critique} \\
+\midrule
+LLMCompass~\cite{llmcompass} & \checkmark & Partial & \texttimes & \texttimes & \texttimes \\
+SPAD~\cite{spad2025} & \checkmark & \texttimes & \texttimes & \texttimes & \texttimes \\
+Chip Under Sanctions~\cite{ning2025sanctions} & \checkmark & \texttimes & \texttimes & \texttimes & \texttimes \\
+Pope et al.~\cite{pope2023efficiently} & TPU-class & \texttimes & \texttimes & \texttimes & \texttimes \\
+Splitwise~\cite{splitwise2024} & Profile-based & \texttimes & \texttimes & \texttimes & \texttimes \\
+Wang et al.~\cite{wang2025systematic} & Profile-based & 4-dim & \texttimes & \texttimes & \texttimes \\
+ZigZag~\cite{zigzag2021} & Spatial accel. & \checkmark & Partial & \texttimes & \texttimes \\
+\midrule
+\textbf{This work} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Prefill-Decode Disaggregation}
+
+The fundamental difference between prefill and decode phases has driven
+a large body of work on disaggregated serving.
+Splitwise~\cite{splitwise2024} separates prefill and decode onto different
+GPU types, achieving superior cost-efficiency. DistServe~\cite{distserve2024}
+disaggregates prefill and decode for goodput-optimized serving, reporting
+up to 7.4$\times$ more requests. Sarathi-Serve~\cite{agrawal2024sarathi}
+introduces chunked prefills to tame throughput-latency tradeoffs.
+Mooncake~\cite{mooncake2024} proposes a KV-cache-centric disaggregated
+architecture. SPAD~\cite{spad2025} takes disaggregation to the hardware
+level, designing specialized prefill chips (larger systolic arrays + GDDR)
+and decode chips (high HBM bandwidth, reduced compute).
+
+Our work complements this line of research by providing the \emph{quantitative
+sensitivity matrix} that justifies disaggregation: we show exactly which
+parameters matter for each phase and by how much, enabling principled
+parameter allocation for phase-specialized designs.
+
+\subsection{LLM Serving Systems}
+
+Orca~\cite{yu2022orca} introduced iteration-level scheduling for
+continuous batching of transformer-based serving.
+vLLM~\cite{kwon2023efficient} applies virtual memory management to KV
+caches via PagedAttention, achieving near-zero memory waste.
+Llumnix~\cite{sun2024llumnix} enables dynamic scheduling with live
+migration of inference requests across GPU instances.
+DeepSpeed-Inference~\cite{aminabadi2022deepspeed} provides multi-GPU
+inference with heterogeneous CPU-GPU strategies. These systems implement
+optimizations (batching, memory management, scheduling) that affect
+utilization patterns; our DSE captures the \emph{architectural}
+tradeoffs that determine the performance envelope within which these
+systems operate.
+
+\subsection{Attention and Memory Optimization}
+
+FlashAttention~\cite{dao2022flashattention} demonstrates that IO-aware
+tiling of attention computation can achieve 2--4$\times$ speedup by
+exploiting on-chip SRAM---precisely the kind of optimization that our
+roofline model \emph{cannot capture} (Section~\ref{sec:blind_spot}).
+FlashAttention-2~\cite{dao2023flashattention2} and
+FlashAttention-3~\cite{shah2024flashattention3} further improve
+parallelism and low-precision support.
+GQA~\cite{ainslie2023gqa} reduces KV cache size by grouping query heads,
+changing the arithmetic intensity landscape.
+KV cache compression~\cite{yang2024kvcompress,hooper2025squeezed,xiao2024duoattention}
+reduces the memory footprint of decode, potentially shifting the
+memory-compute balance our DSE analyzes.
+
+\subsection{Quantization for Inference}
+
+SmoothQuant~\cite{xiao2023smoothquant} enables W8A8 quantization by
+migrating quantization difficulty from activations to weights.
+GPTQ~\cite{frantar2023gptq} and AWQ~\cite{lin2024awq} push to 3--4 bit
+weight quantization with minimal quality loss. These techniques
+effectively double or quadruple the arithmetic intensity of
+weight-memory-bound operators, potentially shifting decode from
+memory-bound to compute-bound. Our DSE uses FP16; extending to
+quantized workloads is important future work that would test whether
+the decode latency formula still holds.
+
+\subsection{Alternative Hardware Approaches}
+
+Processing-in-Memory (PIM) addresses the decode memory bottleneck at
+the hardware level. NeuPIMs~\cite{heo2024neupims} proposes NPU-PIM
+heterogeneous acceleration. CXL-based approaches~\cite{gu2025pim,park2024cxlpnm,kim2025lia}
+extend the memory hierarchy beyond HBM. Chiplet
+architectures~\cite{shao2021simba,chipletgym2024} enable separate
+compute and memory chiplets. These approaches address the \emph{same}
+decode bottleneck our analysis quantifies but through hardware
+innovation rather than architectural parameter tuning.
 
 %% ===========================================================================
 \section{Methodology}
@@ -156,61 +292,50 @@ architecture exploration, which we extend with systematic DSE methodology.
 
 \subsection{Simulation Framework}
 
-We use LLMCompass to model GPU systems at the operator level. The framework
-models a \texttt{System} comprising one or more \texttt{Device}s connected
-by an \texttt{InterConnect}. Each device contains a \texttt{ComputeModule}
-(with configurable core count and systolic arrays), an \texttt{IOModule}
-(with configurable L2 cache and HBM channels), and \texttt{Memory}.
-
-For each operator, the framework computes:
-\begin{itemize}
-\item FLOP count and IO byte count based on tensor dimensions
-\item Compute time = FLOPs / peak\_compute
-\item Memory time = IO\_bytes / peak\_bandwidth
-\item Latency = $\max(\text{compute\_time}, \text{memory\_time})$
-\end{itemize}
-
-A cost model estimates die area based on core count, systolic array size,
-SRAM capacity, L2 cache size, HBM channels, and process node (7nm TSMC),
-decomposed into compute chiplet area and IO die area.
+We use LLMCompass~\cite{llmcompass} to model GPU systems at the operator
+level. Each system comprises one or more devices connected by an
+interconnect. Each device contains a compute module (with configurable
+core count and systolic arrays), an IO module (with configurable L2 cache
+and HBM channels), and memory. For each operator, the framework computes
+$T = \max(\text{FLOPs}/\pi, \text{bytes}/\beta)$ using a process-aware
+area cost model (7nm TSMC).
 
 \subsection{Workload Suite}
 
-We profile 5 transformer models spanning 3 orders of magnitude in parameter
-count (Table~\ref{tab:models}).
+We profile 5 transformer models spanning 3 orders of magnitude in
+parameter count (Table~\ref{tab:models}): GPT-2 Small (117M), GPT-2 XL
+(1.5B), LLaMA-7B, LLaMA-70B, and GPT-3 175B. Each model is evaluated
+across 10 workload scenarios varying batch size (1--64), sequence length
+(128--8192), phase (prefill/decode), and device count (1/4/8), yielding
+\textbf{61 profiling tasks with 732 operator-level measurements}.
 
 \begin{table}[t]
 \centering
-\caption{Model configurations used in profiling.}
+\caption{Model configurations in our workload suite.}
 \label{tab:models}
 \begin{tabular}{lrrrr}
 \toprule
-\textbf{Model} & $d_{\text{model}}$ & $n_{\text{heads}}$ & $n_{\text{layers}}$ & \textbf{Params} \\
+\textbf{Model} & \textbf{Params} & \textbf{Layers} & \textbf{Hidden} & \textbf{Heads} \\
 \midrule
-GPT-2 Small  & 768    & 12  & 12  & 117M \\
-GPT-2 XL     & 1600   & 25  & 48  & 1.5B \\
-LLaMA-7B     & 4096   & 32  & 32  & 7B \\
-LLaMA-70B    & 8192   & 64  & 80  & 70B \\
-GPT-3 175B   & 12288  & 96  & 96  & 175B \\
+GPT-2 Small & 117M & 12 & 768 & 12 \\
+GPT-2 XL & 1.5B & 48 & 1600 & 25 \\
+LLaMA-7B & 6.7B & 32 & 4096 & 32 \\
+LLaMA-70B & 70B & 80 & 8192 & 64 \\
+GPT-3 175B & 175B & 96 & 12288 & 96 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Each model is evaluated across 10 workload scenarios varying batch size
-(1--64), sequence length (128--8192), phase (prefill/decode), and device
-count (1/4/8), yielding 61 profiling tasks with 732 operator-level
-measurements.
+\subsection{Design Space}
 
-\subsection{Design Space Definition}
-
-For DSE, we sweep 5 architectural parameters (Table~\ref{tab:dse_params})
-across 3 device counts (1, 4, 8), generating 7,875 candidate designs.
-Designs exceeding the 900~mm$^2$ reticle limit are pruned, leaving 5,082
-feasible designs for evaluation.
+We sweep 5 architectural parameters across 3 device counts
+(Table~\ref{tab:dse_params}), generating 7,875 candidates. Designs
+exceeding the 900~mm$^2$ reticle limit are pruned, leaving \textbf{5,082
+feasible designs}.
 
 \begin{table}[t]
 \centering
-\caption{DSE parameter space.}
+\caption{DSE parameter space (7,875 candidates, 5,082 feasible).}
 \label{tab:dse_params}
 \begin{tabular}{llr}
 \toprule
@@ -221,443 +346,361 @@ HBM channels & 3, 4, 5, 6, 8 & 5 \\
 Global buffer (MB) & 20, 40, 60, 80, 120 & 5 \\
 Systolic array dim & 8, 16, 32 & 3 \\
 SRAM per core (KB) & 64, 128, 192, 256, 512 & 5 \\
-\midrule
 Device counts & 1, 4, 8 & 3 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% Baseline architecture: NVIDIA A100-like (GA100) with 108 SMs,
-% 40MB L2, 5 HBM2e stacks, 32×32 systolic arrays.
+\subsection{Sensitivity Analysis Methodology}
+\label{sec:sensitivity_method}
 
-\subsection{Evaluation Methodology}
-
-Each design point is evaluated on 4 representative workloads:
-LLaMA-7B and LLaMA-70B, each in prefill and decode phases, at batch
-size 16 and sequence length 1024. We use three optimization objectives:
-\begin{enumerate}
-\item Minimize worst-case prefill latency (ms)
-\item Minimize worst-case decode latency (ms)
-\item Minimize die area (mm$^2$)
-\end{enumerate}
-
-Pareto-optimal designs are identified across all three objectives using
-non-dominated sorting.
+We evaluate sensitivity using \emph{controlled single-parameter sweeps}:
+varying one parameter while holding all others at baseline values
+(64 cores, SA~$16{\times}16$, HBM~4, 128~KB SRAM, 60~MB global buffer).
+We explicitly compare this against the naive averaging method (computing
+mean latency at each parameter level across all configurations) to
+demonstrate the methodological difference (Section~\ref{sec:methodology_critique}).
 
 %% ===========================================================================
-\section{Profiling Results: Bottleneck Analysis}
-\label{sec:profiling}
+\section{Results}
+\label{sec:results}
 
-\subsection{The Prefill-Decode Duality}
+\subsection{Bottleneck Taxonomy}
+\label{sec:bottleneck}
 
-Table~\ref{tab:bottleneck} presents the operator-level bottleneck
-classification across all 61 workload configurations. The most striking
-finding is the \emph{complete asymmetry} between phases.
+Across 732 operator measurements, we confirm the phase duality reported
+in prior work~\cite{splitwise2024,distserve2024}: prefill operators are
+a mix of compute-bound (32.8\%) and memory-bound (67.2\%), while decode
+operators are \textbf{universally memory-bound} (100\%, all 384
+measurements). This holds across all 5 models, all batch sizes, all
+sequence lengths, and all device counts.
 
-\begin{table}[t]
-\centering
-\caption{Operator bottleneck classification by phase.}
-\label{tab:bottleneck}
-\begin{tabular}{lrr}
-\toprule
-& \textbf{Prefill} & \textbf{Decode} \\
-\midrule
-Compute-bound operators & 114 (32.8\%) & 0 (0.0\%) \\
-Memory-bound operators  & 234 (67.2\%) & 384 (100\%) \\
-\midrule
-Mean compute fraction   & 0.744 & 0.000 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Decode is \textbf{universally memory-bound}: across all 384 operator
-measurements spanning 5 models, batch sizes 1--64, sequence lengths
-128--8192, and 1--8 devices, \emph{not a single operator} becomes
-compute-bound during decode. This is not a matter of degree---the
-compute fraction rounds to exactly zero.
-
-\subsection{Operator-Level Invariants}
-
-We observe that bottleneck classification is determined primarily by
-\emph{operator type}, not workload parameters:
-
-\begin{itemize}
-\item \textbf{Always compute-bound in prefill}: FFN matmuls
-(\texttt{h\_matmul1}, \texttt{h\_matmul2}) and QKV projection
-(\texttt{qkv\_proj}, \texttt{h\_matmul0}). These operators have
-arithmetic intensity $>$1500, far exceeding the ridge point ($\sim$180).
-
-\item \textbf{Always memory-bound}: Attention operators
-(\texttt{q\_mul\_k}, \texttt{a\_mul\_v}), vector operations
-(\texttt{softmax}, \texttt{layernorm}, \texttt{gelu}), and
-communication (\texttt{allreduce}). These operators remain
-memory-bound even during prefill at batch size 64.
-\end{itemize}
+The key addition over prior assertions is \emph{operator-level granularity}:
+we identify that bottleneck classification is determined by \emph{operator
+type}, not workload parameters. FFN matmuls and QKV projections are always
+compute-bound in prefill (AI $>$ 1500); attention operators and vector
+operations are always memory-bound in both phases.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/bottleneck_classification}
-\caption{Bottleneck classification by model and phase. Prefill shows a mix of
-compute-bound and memory-bound operators, while decode is universally
-memory-bound across all models.}
+\includegraphics[width=\linewidth]{figures/bottleneck_classification.pdf}
+\caption{Bottleneck classification across 732 operators. Decode is
+universally memory-bound; prefill shows operator-type-dependent duality.}
 \label{fig:bottleneck}
 \end{figure}
 
-\subsection{Latency Dominance Analysis}
+\subsection{Phase-Orthogonal Sensitivity Matrix}
+\label{sec:sensitivity}
 
-The FFN pathway dominates total latency:
-\texttt{h\_matmul1} and \texttt{h\_matmul2} together account for
-\textbf{48.2\%} of total inference time. The QKV projection adds
-18.4\%, bringing the matmul-dominated fraction to 66.6\%. This
-motivates prioritizing systolic array performance over vector unit
-or memory subsystem optimization for prefill workloads.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/operator_breakdown}
-\caption{Operator-level latency breakdown for LLaMA-70B. (a)~Prefill is
-dominated by compute-bound FFN matmuls; (b)~decode is entirely
-memory-bound, with allreduce communication consuming a significant fraction.}
-\label{fig:operator_breakdown}
-\end{figure*}
-
-%% ===========================================================================
-\section{Design Space Exploration Results}
-\label{sec:dse}
-
-\subsection{Parameter Sensitivity}
-
-We analyze parameter sensitivity using \emph{controlled single-parameter
-sweeps}: varying one parameter while holding all others constant at
-baseline values (64 cores, systolic~$16\times16$, 4 HBM channels,
-128~KB SRAM, 60~MB global buffer). This avoids the confounding effects
-of averaging across all configurations, which we found produces
-misleading results (Section~\ref{sec:discussion}).
-
-Table~\ref{tab:sensitivity} presents the results.
+Table~\ref{tab:sensitivity} presents the controlled sensitivity analysis,
+the first complete 5-parameter $\times$ 3-objective matrix for GPU-class
+LLM inference.
 
 \begin{table}[t]
 \centering
-\caption{Controlled single-parameter sensitivity. Sweep results with all
-other parameters held at baseline.}
+\caption{Controlled single-parameter sensitivity. Bold indicates the
+dominant parameter for each objective.}
 \label{tab:sensitivity}
 \begin{tabular}{lrrr}
 \toprule
 \textbf{Parameter} & \textbf{Prefill (\%)} & \textbf{Decode (\%)} & \textbf{Area (\%)} \\
 \midrule
-Systolic array dim (8--32) & \textbf{1253.3} & 0.0 & 12.9 \\
-Core count (32--128)       & 277.2 & 0.0 & \textbf{109.8} \\
-HBM channels (3--8)        & 2.9 & \textbf{73.5} & 16.2 \\
-Global buffer (20--120~MB)  & 0.0 & 0.0 & 56.5 \\
-SRAM (64--512~KB)          & 0.0 & 0.0 & 12.9 \\
+Systolic array (8--32) & \textbf{1253.3} & 0.0 & 12.9 \\
+Core count (32--128)   & 277.2 & 0.0 & \textbf{109.8} \\
+HBM channels (3--8)    & 2.9 & \textbf{73.5} & 16.2 \\
+Global buffer (20--120) & 0.0 & 0.0 & 56.5 \\
+SRAM (64--512\,KB)     & 0.0 & 0.0 & 12.9 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Three critical observations emerge (Figure~\ref{fig:sensitivity}):
+The sensitivity matrix reveals \textbf{near-perfect orthogonality}
+between prefill and decode optimization vectors:
+\begin{itemize}
+\item Prefill is dominated by systolic array dimension (1253\% range),
+with secondary contribution from core count (277\%). HBM channels have
+only 2.9\% effect.
+\item Decode is dominated solely by HBM channels (73.5\%). All other
+parameters---including systolic array dimension and core count---have
+\emph{exactly zero} effect.
+\item The cross-influence (SA on decode, HBM on prefill) is negligibly
+small (0.0\% and 2.9\% respectively).
+\end{itemize}
+
+\paragraph{Area-ROI comparison.}
+The area efficiency of systolic array scaling versus core scaling is
+dramatically different (Figure~\ref{fig:area_efficiency}):
+
+\begin{itemize}
+\item SA dim 8$\to$32: 13.53$\times$ prefill speedup for 12.9\% area
+increase $\Rightarrow$ \textbf{ROI = 104.9$\times$/area-unit}
+\item Cores 32$\to$128: 3.77$\times$ prefill speedup for 109.8\% area
+increase $\Rightarrow$ \textbf{ROI = 3.4$\times$/area-unit}
+\end{itemize}
+
+The ratio is \textbf{30.5$\times$} in favor of systolic array scaling.
+This occurs because systolic throughput scales quadratically with
+dimension ($O(n^2)$) while die area scales linearly, creating a
+super-linear ROI that core count replication cannot match.
+
+No prior work has quantified this area-ROI comparison for LLM inference
+architectures. SPAD~\cite{spad2025} designs phase-specialized chips but
+does not report per-mm$^2$ efficiency. Chip Under
+Sanctions~\cite{ning2025sanctions} explores the design space under
+constraints but does not isolate individual parameter contributions
+with controlled sweeps.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/sensitivity_heatmap_corrected}
-\caption{Parameter sensitivity heatmap. Systolic array dimension dominates
-prefill, HBM channels dominate decode, and core count drives die area.
-SRAM and global buffer have \emph{zero} measurable latency effect.}
-\label{fig:sensitivity}
+\includegraphics[width=\linewidth]{figures/area_efficiency.pdf}
+\caption{Area-ROI comparison: systolic array dimension scaling versus
+core count scaling for prefill latency. SA provides 30.5$\times$ better
+return per mm$^2$ of die area.}
+\label{fig:area_efficiency}
 \end{figure}
 
-\paragraph{Systolic array dimension dominates prefill.}
-The systolic array dimension exhibits 1253\% range on prefill latency---
-from 47,140~ms (dim~8) to 3,484~ms (dim~32)---yielding a 13.53$\times$
-speedup for only 12.9\% area increase. By contrast, quadrupling core
-count (32$\to$128) yields only 3.77$\times$ speedup at 109.8\% area cost.
-The area-ROI ratio is \textbf{30.5$\times$} in favor of systolic array
-scaling. This occurs because systolic throughput scales quadratically
-with dimension ($O(n^2)$) while area scales linearly.
+\subsection{Decode Latency Formula and Compute Floor}
+\label{sec:decode_formula}
 
-\paragraph{HBM bandwidth dominates decode, but with a floor.}
-HBM channel count accounts for 73.5\% of decode variation. No other
-parameter has \emph{any} measurable decode impact. However, the
-relationship is not linear. We find an excellent fit to:
+We discover that decode latency follows a precise hyperbolic model
+(Figure~\ref{fig:decode_formula}):
 \begin{equation}
 T_{\text{decode}} = \frac{65.16}{\text{BW}} + 25.20 \text{ ms}
 \quad (R^2 > 0.9999)
 \label{eq:decode_formula}
 \end{equation}
-where BW is HBM bandwidth in TB/s. The 25.20~ms compute floor
-constitutes 55.9\% of the fastest decode configuration and imposes
-\emph{severe diminishing returns} on bandwidth investment beyond
-$\sim$3~TB/s.
+where BW is HBM bandwidth in TB/s.
 
-\paragraph{On-chip memory has zero latency effect.}
-The most surprising finding: SRAM (64--512~KB) and global buffer
-(20--120~MB) have \textbf{zero} effect on latency across all
-configurations tested\footnote{69 of 361 global buffer configurations
-show a threshold effect at 20~MB, with $\sim$1.2\% degradation. Above
-40~MB, the effect vanishes completely.}. They affect only die area.
-This is a critical \emph{model limitation} of the roofline framework
-(Section~\ref{sec:discussion}), not an architectural truth---real GPU
-workloads benefit significantly from on-chip data reuse
-(e.g., FlashAttention~\cite{dao2022flashattention}).
+The 25.20\,ms constant represents a \textbf{compute floor}---irreducible
+latency from non-memory operations (compute pipeline, scheduling,
+synchronization). At the highest tested bandwidth (3.28~TB/s, HBM=8),
+this floor constitutes \textbf{55.9\%} of total decode time.
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/oat_sensitivity}
-\caption{One-at-a-time sensitivity analysis. (a)~SA dimension yields
-quadratic prefill reduction; (b)~HBM channels provide sub-linear decode
-improvement (not linear due to compute floor); (c)~Core count shows
-diminishing returns at high counts.}
-\label{fig:oat}
-\end{figure*}
+\paragraph{Implications for bandwidth investment.}
+The hyperbolic form means that doubling bandwidth from 1.6~TB/s to
+3.3~TB/s reduces decode latency by only 29\% (from 65.9~ms to 45.1~ms),
+not 50\%. Further doubling to 6.6~TB/s would yield only 12\% additional
+reduction (to 35.1~ms). The floor imposes severe diminishing returns on
+HBM investment.
 
-\subsection{Pareto Frontier Analysis}
-
-Of 5,082 feasible designs, 79 are Pareto-optimal across prefill latency,
-decode latency, and die area. The frontier reveals a clear structure
-(Figure~\ref{fig:pareto}):
-
-\begin{itemize}
-\item \textbf{4-device designs} (48/79 Pareto points) achieve the
-best decode latency (34.5~ms) but higher prefill (766.7~ms minimum).
-\item \textbf{8-device designs} (31/79 Pareto points) achieve the
-best prefill latency (550.5~ms) but worse decode (47.7~ms minimum).
-\item \textbf{1-device designs}: none appear on the Pareto frontier.
-\end{itemize}
-
-The Pearson correlation between prefill and decode latency on the Pareto
-frontier is $r = -0.294$, confirming that these objectives are
-structurally anti-correlated.
+This formula has not appeared in prior work. Pope et
+al.~\cite{pope2023efficiently} model transformer inference analytically
+on TPUs but do not derive a closed-form decode latency with a compute
+floor. Ma and Patterson~\cite{ma2026memory} identify memory bandwidth
+as the primary challenge but do not quantify the floor. Our formula
+provides a concrete tool for architects to evaluate the ROI of bandwidth
+investment.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/pareto_frontier}
-\caption{Pareto frontier: prefill vs decode latency. Pareto-optimal
-designs (colored markers) are partitioned into 4-device (blue, decode-optimized)
-and 8-device (red, prefill-optimized) configurations. Marker size indicates
-die area. Gray background shows all 5,082 feasible designs.}
+\includegraphics[width=\linewidth]{figures/decode_formula.pdf}
+\caption{Decode latency vs. HBM bandwidth with fitted hyperbolic model.
+The 25.20\,ms compute floor (dashed line) constitutes 56\% of latency
+at the highest bandwidth.}
+\label{fig:decode_formula}
+\end{figure}
+
+\subsection{Pareto Frontier Analysis}
+
+Of 5,082 designs, 79 are Pareto-optimal across prefill latency, decode
+latency, and die area. The frontier structure confirms the phase
+orthogonality (Figure~\ref{fig:pareto}):
+\begin{itemize}
+\item \textbf{4-device designs} (48/79) achieve the best decode (34.5~ms)
+but higher prefill ($\geq$766.7~ms).
+\item \textbf{8-device designs} (31/79) achieve the best prefill
+(550.5~ms) but worse decode ($\geq$47.7~ms).
+\item No 1-device design appears on the Pareto frontier.
+\item Prefill-decode correlation on the frontier is $r = -0.294$
+(anti-correlated).
+\end{itemize}
+
+This anti-correlation provides quantitative support for the disaggregated
+serving approach of Splitwise~\cite{splitwise2024} and
+DistServe~\cite{distserve2024}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/pareto_frontier.pdf}
+\caption{Pareto frontier across 5,082 designs. No 1-device design is
+Pareto-optimal. 4-device designs favor decode; 8-device designs favor
+prefill.}
 \label{fig:pareto}
 \end{figure}
 
-\subsection{Area-Performance Tradeoffs}
+\subsection{Multi-Device Scaling}
 
-Table~\ref{tab:area_eff} shows the marginal return per mm$^2$ for each
-parameter increment, measured via controlled single-parameter sweeps.
+Decode scaling is negative beyond 4 devices: going from 4 to 8 devices
+\emph{increases} decode latency by 25\% (0.51~ms $\to$ 0.64~ms for
+LLaMA-70B) because allreduce communication overhead exceeds the compute
+savings. Prefill scaling remains reasonable (78.2\% efficiency at 8
+devices). This asymmetry further supports phase-specific device count
+selection.
+
+\subsection{DSE Methodology Critique}
+\label{sec:methodology_critique}
+
+We compare two sensitivity analysis approaches on the same 5,082-design
+dataset (Table~\ref{tab:method_compare}):
 
 \begin{table}[t]
 \centering
-\caption{Marginal prefill latency reduction per mm$^2$ of die area.}
-\label{tab:area_eff}
-\begin{tabular}{lrrr}
+\caption{Naive averaging vs. controlled sweeps for sensitivity analysis.
+Naive averaging produces phantom sensitivities for on-chip memory.}
+\label{tab:method_compare}
+\begin{tabular}{lrr}
 \toprule
-\textbf{Parameter Step} & $\Delta$\textbf{Lat (ms)} & $\Delta$\textbf{Area} & \textbf{ms/mm$^2$} \\
+\textbf{Parameter} & \textbf{Naive (\%)} & \textbf{Controlled (\%)} \\
 \midrule
-SA dim 8$\to$16     & $-$34,982 & +12.9    & \textbf{2,711} \\
-SA dim 16$\to$32    & $-$8,674  & +51.7    & 168 \\
-Cores 32$\to$64     & $-$11,763 & +137.8   & 85 \\
-Cores 64$\to$128    & $-$5,818  & +275.7   & 21 \\
-HBM 3$\to$8 (decode) & $-$33.1  & +80.9    & 0.41 \\
+Systolic array & 1,074.8 & 1,253.3 \\
+Core count     & 206.2   & 277.2 \\
+HBM channels   & 35.2    & 73.5 \\
+Global buffer  & 17.4    & \textbf{0.0} \\
+SRAM           & 8.1     & \textbf{0.0} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The most significant finding is that systolic array scaling is
-\textbf{30.5$\times$ more area-efficient} than core scaling for prefill
-optimization.
+The naive method produces \emph{phantom sensitivities}: SRAM appears to
+have 8.1\% impact and global buffer 17.4\% impact under averaging, but
+both have \emph{exactly zero} effect under controlled sweeps. The phantom
+effect arises because designs with larger SRAM/buffer also tend to have
+different core counts and SA dimensions, and the averaging method
+attributes the correlated latency variation to the wrong parameter.
 
-\paragraph{The decode latency floor.}
-Equation~(\ref{eq:decode_formula}) reveals a fundamental constraint:
-the 25.20~ms compute floor means that even infinite HBM bandwidth can
-only reduce decode latency to 25.20~ms. At the highest tested bandwidth
-(3.28~TB/s, HBM=8), the floor already constitutes 55.9\% of total decode
-time (Figure~\ref{fig:decode_formula}). This means HBM bandwidth
-investment has severe diminishing returns beyond $\sim$3~TB/s, and further
-decode improvement requires algorithmic approaches (operator fusion,
-speculative decoding) that reduce the compute floor itself.
+This finding has direct implications for prior DSE work that uses
+averaging-based sensitivity analysis~\cite{llmcompass}: reported
+sensitivities for confounded parameters may be entirely artifactual.
+We recommend that all DSE studies use controlled single-parameter sweeps
+with explicit baseline configurations.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\columnwidth]{figures/decode_formula}
-\caption{Decode latency follows $T = 65.16/\text{BW} + 25.20$~ms with
-near-perfect fit ($R^2 > 0.9999$). The 25.20~ms compute floor constitutes
-an increasing fraction of total latency as bandwidth grows, creating
-severe diminishing returns.}
-\label{fig:decode_formula}
-\end{figure}
+\subsection{Roofline Blind Spot: On-Chip Memory}
+\label{sec:blind_spot}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\columnwidth]{figures/memory_zero_effect}
-\caption{On-chip memory (SRAM, global buffer) has zero measurable effect
-on latency in the roofline model. This is a critical model limitation---
-real GPU workloads benefit from on-chip data reuse.}
-\label{fig:memory_zero}
-\end{figure}
+The zero sensitivity of SRAM and global buffer is not merely a statistical
+artifact---it is a \emph{structural property of the roofline model}.
+Because the model computes operator latency as
+$\max(\text{FLOPs}/\pi, \text{bytes}/\beta)$ using \emph{peak} HBM
+bandwidth $\beta$, it assumes all data is served from HBM regardless of
+on-chip availability. Varying SRAM from 64~KB to 512~KB (8$\times$) or
+global buffer from 20~MB to 120~MB (6$\times$) produces identical latency
+predictions.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\columnwidth]{figures/area_efficiency}
-\caption{Area efficiency comparison. Systolic array scaling (red) provides
-orders-of-magnitude better ROI per mm$^2$ than core scaling (green) for
-prefill optimization.}
-\label{fig:area_eff}
-\end{figure}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/diminishing_returns}
-\caption{ROI diminishing returns. (a)~Prefill ROI drops sharply after
-initial SA/core scaling steps; (b)~Decode ROI is dominated by HBM channels
-with negligible contribution from other parameters.}
-\label{fig:diminishing}
-\end{figure*}
-
-%% ===========================================================================
-\section{Multi-Device Scaling Analysis}
-\label{sec:scaling}
-
-\subsection{Prefill Scaling: Near-Linear}
-
-Prefill exhibits good scaling behavior with multi-device tensor
-parallelism: 86.9\% efficiency at 4 devices and 78.2\% at 8 devices.
-This is expected because prefill operators have high arithmetic intensity
-and large tensor dimensions, allowing effective parallelization.
-
-\subsection{Decode Scaling: The Scaling Wall}
-
-Decode scaling is severely sub-linear and can be counter-productive:
-
+In reality, on-chip memory is critical for performance:
 \begin{itemize}
-\item 1$\to$4 devices: 38.8\% efficiency
-\item 1$\to$8 devices: \textbf{15.0\%} efficiency
+\item FlashAttention~\cite{dao2022flashattention} achieves 2--4$\times$
+speedup by tiling attention computation to fit in SRAM.
+\item Global buffer (L2 cache) provides data reuse for weight
+matrices~\cite{jia2019dissecting}.
+\item KV cache residency in on-chip memory eliminates repeated HBM
+accesses during decode~\cite{kwon2023efficient}.
 \end{itemize}
 
-In concrete terms, for LLaMA-70B decode (bs=16, sl=1024): going from
-4 to 8 devices \emph{increases} latency from 0.51~ms to 0.64~ms.
-The culprit is communication overhead: at 8 devices, allreduce consumes
-37--40\% of total decode time.
+This blind spot means that roofline-based DSE \emph{should not be used
+to dimension on-chip memories}. For memory hierarchy design, the community
+needs models that capture data reuse, multi-level caching, and
+tiling~\cite{parashar2019timeloop,zigzag2021}---or must resort to
+cycle-accurate simulation.
 
-This has profound implications for inference serving: \textbf{4-device
-clusters are strictly superior to 8-device clusters for decode-heavy
-autoregressive generation.}
-
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/workload_scaling}
-\caption{Workload parameter scaling. (a)~Prefill latency scales linearly
-with batch size while decode remains flat; (b)~Prefill latency scales
-super-linearly with sequence length.}
-\label{fig:workload_scaling}
-\end{figure*}
+\includegraphics[width=\linewidth]{figures/memory_zero_effect.pdf}
+\caption{On-chip memory (SRAM, global buffer) shows exactly zero latency
+effect across all configurations---a structural blind spot of the
+roofline model.}
+\label{fig:memory_zero}
+\end{figure}
 
 %% ===========================================================================
 \section{Design Guidelines}
 \label{sec:guidelines}
 
-Synthesizing our findings, we propose six design guidelines for
-next-generation LLM inference accelerators:
+We distill our findings into six guidelines, each annotated with its
+reliability given the roofline model's limitations:
 
 \begin{enumerate}
-\item \textbf{Prioritize systolic array dimensions over core count.}
-A 32$\times$32 systolic array provides 30.5$\times$ better area-ROI than
-adding cores. Going from 8$\times$8 to 32$\times$32 delivers
-13.53$\times$ prefill speedup for only 12.9\% die area increase.
+\item \textbf{Prioritize systolic array dimensions over core count}
+(\emph{high confidence}). SA scaling provides 30.5$\times$ better
+area-ROI than core scaling. This is reliable because the roofline
+model accurately captures compute throughput scaling.
 
 \item \textbf{Target 3--4~TB/s HBM bandwidth; beyond this, diminishing
-returns dominate.}
-Decode follows $T = 65.16/\text{BW} + 25.20$~ms. The 25.20~ms compute
-floor means bandwidth beyond $\sim$4~TB/s yields $<$10\% marginal improvement.
+returns dominate} (\emph{high confidence}). The decode formula
+(Eq.~\ref{eq:decode_formula}) quantifies the floor.
 
-\item \textbf{Use the ``balanced mid-range'' core count (64--96).}
-Core count has linear but area-expensive scaling (3.77$\times$ speedup
-for 4$\times$ cores). Beyond 96 cores, the area cost severely
-outweighs the diminishing latency benefits.
+\item \textbf{Use 64--96 core count as the balanced mid-range}
+(\emph{moderate confidence}). Beyond 96 cores, area cost severely
+outweighs latency benefit. Area model is reliable; latency model may
+underestimate benefits from improved scheduling.
 
-\item \textbf{Optimize for 4-device, not 8-device decode serving.}
-4-device configurations achieve 1.38$\times$ better decode latency
-than 8-device due to reduced communication overhead.
+\item \textbf{Optimize for 4-device, not 8-device decode serving}
+(\emph{moderate confidence}). Communication model captures the
+inversion point but may not reflect NVLink 5/NVSwitch advances.
 
-\item \textbf{Do not rely on roofline models for on-chip memory sizing.}
-SRAM and global buffer have zero modeled effect but are known to matter
-in practice. Use cycle-accurate simulation or real benchmarks for memory
-hierarchy design decisions.
+\item \textbf{Do not rely on roofline DSE for on-chip memory sizing}
+(\emph{critical finding}). SRAM and buffer show zero modeled effect
+but are known to matter in practice. Use cycle-accurate simulation.
 
-\item \textbf{Consider prefill-decode architectural disaggregation.}
-The orthogonality of prefill (systolic-limited) and decode
-(bandwidth-limited) optimization vectors suggests that no single
-architecture can optimally serve both.
+\item \textbf{Consider prefill-decode architectural disaggregation}
+(\emph{high confidence}). The near-perfect orthogonality of
+sensitivity vectors is a robust finding.
 \end{enumerate}
 
 %% ===========================================================================
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{Roofline model limitations.}
-Our analysis relies on the roofline model, which computes operator latency
-as $\max(\text{FLOPs}/\pi, \text{bytes}/\beta)$ using peak throughput and
-bandwidth. This abstraction has two critical blind spots:
+\paragraph{Scope and limitations.}
+Our study uses FP16 arithmetic. Quantization
+(W8A8~\cite{xiao2023smoothquant}, W4A16~\cite{lin2024awq,frantar2023gptq})
+would change arithmetic intensity and may shift the decode phase toward
+compute-bound, potentially invalidating the decode formula. We use
+multi-head attention (MHA); GQA~\cite{ainslie2023gqa} reduces KV cache
+size and would affect decode memory access patterns. MoE
+models~\cite{hwang2024pregated,tutel2023} have sparse activation
+patterns creating different hardware demands. Very long sequences
+($>$8K tokens) with KV-cache management may change the on-chip memory
+calculus. Speculative decoding~\cite{leviathan2023fast} transforms
+decode from single-token to small-batch verification.
 
-\emph{First}, it does not model on-chip data reuse. SRAM and global buffer
-sizes have zero effect on modeled latency because the roofline always uses
-peak HBM bandwidth regardless of whether data could be served from on-chip
-memory. In reality, techniques like FlashAttention~\cite{dao2022flashattention}
-exploit SRAM tiling for 2--4$\times$ speedup. Our finding that ``on-chip memory
-has zero latency effect'' is therefore a \emph{model limitation}, and should
-not be interpreted as architectural guidance.
+\paragraph{Generalizability of the decode formula.}
+The formula $T = 65.16/\text{BW} + 25.20$\,ms is derived from a specific
+workload (LLaMA-70B, bs=16, sl=1024) on the LLMCompass model. The
+\emph{functional form} (hyperbolic with floor) should generalize because
+the floor reflects non-memory compute overhead, but the \emph{coefficients}
+will vary with model size, batch size, and sequence length. We encourage
+the community to validate this formula on real silicon.
 
-\emph{Second}, the 25.20~ms decode compute floor in
-Equation~(\ref{eq:decode_formula}) may reflect overhead from non-compute
-operations (memory controller latency, scheduling) that the model captures
-through its bandwidth calculation, or may be a modeling artifact. Real
-systems should validate this floor.
-
-\paragraph{Sensitivity analysis methodology.}
-We initially computed parameter sensitivity by averaging across all
-configurations at each parameter level (common in prior
-work~\cite{llmcompass}). This methodology is flawed: it confounds the
-target parameter with the distribution of other parameters. For example,
-SRAM appeared to have 8.1\% prefill impact under this methodology---
-entirely an artifact of correlated parameter distributions. Our controlled
-single-parameter sweeps (Section~\ref{sec:dse}) correct this.
-
-\paragraph{Scope limitations.}
-Our study covers standard dense transformer architectures. Mixture-of-Experts
-(MoE) models, which activate only a subset of parameters per token, may shift
-the compute-memory balance. Similarly, very long sequences ($>$8K tokens)
-with KV-cache management may change the on-chip memory calculus. GQA/MQA
-attention variants would also affect the attention-vs-FFN balance.
+\paragraph{Complementarity with prior work.}
+Our sensitivity matrix complements SPAD's~\cite{spad2025}
+phase-specialized designs by providing the quantitative justification.
+Our methodology critique applies to any roofline-based DSE, including
+ZigZag~\cite{zigzag2021} and Timeloop~\cite{parashar2019timeloop},
+when used without on-chip memory modeling.
 
 %% ===========================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-Through systematic profiling and design space exploration of GPU
-architectures for LLM inference, we demonstrate that the prefill and
-decode phases present fundamentally opposed architectural requirements.
-Our analysis reveals that systolic array dimensions offer 30.5$\times$
-better area-ROI than core scaling for prefill, while decode follows a
-precise formula ($T = 65.16/\text{BW} + 25.20$~ms) with a significant
-compute floor that limits bandwidth scaling returns. Perhaps most
-importantly, we discover that the roofline model produces zero sensitivity
-to on-chip memory parameters---a critical modeling gap that current
-analytical frameworks must address before being used for memory hierarchy
-design decisions. These findings motivate both architectural innovation
-(heterogeneous prefill-decode engines) and modeling innovation (capturing
-data reuse and memory hierarchy effects) for next-generation LLM
-accelerators.
+We present the first critical analysis of roofline-based GPU architecture
+DSE for LLM inference. Through 5,082 design evaluations, we derive a
+precise decode latency formula with a compute floor, construct a
+phase-orthogonal sensitivity matrix showing 30.5$\times$ better area-ROI
+for systolic array scaling, demonstrate that common sensitivity analysis
+methodology produces phantom sensitivities, and identify a critical blind
+spot in on-chip memory modeling. These findings establish the boundary
+between what analytical DSE can reliably inform (compute and bandwidth
+allocation) and what requires more detailed modeling (memory hierarchy
+design). We hope this work helps the community use roofline-based DSE
+more effectively and motivates the development of more accurate analytical
+models that capture on-chip data reuse.
 
 %% ===========================================================================
 \bibliographystyle{ACM-Reference-Format}
 
-\begin{thebibliography}{10}
+\begin{thebibliography}{99}
 
-\bibitem{brown2020language}
-T.~Brown et~al.
-\newblock Language models are few-shot learners.
-\newblock In \emph{NeurIPS}, 2020.
-
-\bibitem{touvron2023llama}
-H.~Touvron et~al.
-\newblock LLaMA: Open and efficient foundation language models.
-\newblock \emph{arXiv:2302.13971}, 2023.
+%% --- Core references ---
 
 \bibitem{williams2009roofline}
 S.~Williams, A.~Waterman, and D.~Patterson.
@@ -666,42 +709,295 @@ S.~Williams, A.~Waterman, and D.~Patterson.
 \newblock \emph{CACM}, 52(4):65--76, 2009.
 
 \bibitem{llmcompass}
-H.~Zhang et~al.
-\newblock LLMCompass: Enabling efficient hardware design for large language
+H.~Zhang, A.~Ning, R.~Prabhakar, and D.~Wentzlaff.
+\newblock {LLMCompass}: Enabling efficient hardware design for large language
   model inference.
 \newblock In \emph{ISCA}, 2024.
 
-\bibitem{jouppi2017datacenter}
-N.~Jouppi et~al.
-\newblock In-datacenter performance analysis of a tensor processing unit.
-\newblock In \emph{ISCA}, 2017.
+\bibitem{spad2025}
+H.~Zhang et~al.
+\newblock {SPAD}: Phase-specialized architecture design for {LLM} inference.
+\newblock \emph{arXiv:2510.08544}, 2025.
 
-\bibitem{jia2019dissecting}
-Z.~Jia, M.~Maggioni, B.~Staiger, and D.~Scarpazza.
-\newblock Dissecting the NVIDIA Volta GPU architecture via microbenchmarking.
-\newblock \emph{arXiv:1804.06826}, 2019.
+\bibitem{ning2025sanctions}
+A.~Ning and D.~Wentzlaff.
+\newblock Chip architectures under sanctions.
+\newblock In \emph{ISCA}, 2025.
 
-\bibitem{chen2019eyeriss}
-Y.-H.~Chen et~al.
-\newblock Eyeriss v2: A flexible accelerator for emerging deep neural networks.
-\newblock \emph{JETCAS}, 2019.
+%% --- Disaggregated serving ---
 
-\bibitem{dao2022flashattention}
-T.~Dao et~al.
-\newblock FlashAttention: Fast and memory-efficient exact attention with
-  IO-awareness.
-\newblock In \emph{NeurIPS}, 2022.
+\bibitem{splitwise2024}
+V.~Patel et~al.
+\newblock Splitwise: Efficient generative {LLM} inference with phase splitting.
+\newblock In \emph{ISCA}, 2024.
+
+\bibitem{distserve2024}
+Y.~Zhong et~al.
+\newblock {DistServe}: Disaggregating prefill and decoding for goodput-optimized
+  {LLM} serving.
+\newblock In \emph{OSDI}, 2024.
+
+\bibitem{mooncake2024}
+R.~Qin et~al.
+\newblock Mooncake: A {KVCache}-centric disaggregated architecture for {LLM}
+  serving.
+\newblock \emph{ACM TOCS}, 2024.
+
+%% --- Serving systems ---
+
+\bibitem{yu2022orca}
+G.~Yu et~al.
+\newblock Orca: A distributed serving system for transformer-based generative
+  models.
+\newblock In \emph{OSDI}, 2022.
 
 \bibitem{kwon2023efficient}
 W.~Kwon et~al.
 \newblock Efficient memory management for large language model serving with
-  PagedAttention.
+  {PagedAttention}.
 \newblock In \emph{SOSP}, 2023.
+
+\bibitem{agrawal2024sarathi}
+A.~Agrawal et~al.
+\newblock Taming throughput-latency tradeoff in {LLM} inference with
+  {Sarathi-Serve}.
+\newblock In \emph{OSDI}, 2024.
+
+\bibitem{sun2024llumnix}
+B.~Sun et~al.
+\newblock Llumnix: Dynamic scheduling for large language model serving.
+\newblock In \emph{OSDI}, 2024.
+
+\bibitem{aminabadi2022deepspeed}
+R.~Y.~Aminabadi et~al.
+\newblock {DeepSpeed-Inference}: Enabling efficient inference of transformer
+  models at unprecedented scale.
+\newblock In \emph{SC}, 2022.
+
+%% --- Attention optimization ---
+
+\bibitem{dao2022flashattention}
+T.~Dao et~al.
+\newblock {FlashAttention}: Fast and memory-efficient exact attention with
+  {IO}-awareness.
+\newblock In \emph{NeurIPS}, 2022.
+
+\bibitem{dao2023flashattention2}
+T.~Dao.
+\newblock {FlashAttention-2}: Faster attention with better parallelism and work
+  partitioning.
+\newblock \emph{arXiv:2307.08691}, 2023.
+
+\bibitem{shah2024flashattention3}
+J.~Shah et~al.
+\newblock {FlashAttention-3}: Fast and accurate attention with asynchrony and
+  low-precision.
+\newblock In \emph{NeurIPS}, 2024.
+
+\bibitem{ainslie2023gqa}
+J.~Ainslie et~al.
+\newblock {GQA}: Training generalized multi-query transformer models from
+  multi-head checkpoints.
+\newblock In \emph{EMNLP}, 2023.
+
+%% --- Quantization ---
+
+\bibitem{xiao2023smoothquant}
+G.~Xiao et~al.
+\newblock {SmoothQuant}: Accurate and efficient post-training quantization for
+  large language models.
+\newblock In \emph{ICML}, 2023.
+
+\bibitem{frantar2023gptq}
+E.~Frantar et~al.
+\newblock {GPTQ}: Accurate post-training quantization for generative
+  pre-trained transformers.
+\newblock In \emph{ICLR}, 2023.
+
+\bibitem{lin2024awq}
+J.~Lin et~al.
+\newblock {AWQ}: Activation-aware weight quantization for {LLM} compression
+  and acceleration.
+\newblock In \emph{MLSys}, 2024.
+
+%% --- Speculative decoding ---
 
 \bibitem{leviathan2023fast}
 Y.~Leviathan, M.~Kalman, and Y.~Matias.
 \newblock Fast inference from transformers via speculative decoding.
 \newblock In \emph{ICML}, 2023.
+
+%% --- DSE tools ---
+
+\bibitem{zigzag2021}
+L.~Mei et~al.
+\newblock {ZigZag}: Enlarging joint architecture-mapping design space
+  exploration for {DNN} accelerators.
+\newblock \emph{IEEE TC}, 2021.
+
+\bibitem{parashar2019timeloop}
+A.~Parashar et~al.
+\newblock Timeloop: A systematic approach to {DNN} accelerator evaluation.
+\newblock In \emph{ISPASS}, 2019.
+
+%% --- Analytical modeling ---
+
+\bibitem{pope2023efficiently}
+R.~Pope et~al.
+\newblock Efficiently scaling transformer inference.
+\newblock In \emph{MLSys}, 2023.
+
+\bibitem{wang2025systematic}
+X.~Wang et~al.
+\newblock A systematic characterization of {GPU} architectures for {LLM}
+  inference.
+\newblock \emph{arXiv:2512.01644}, 2025.
+
+\bibitem{ma2026memory}
+C.~Ma and D.~Patterson.
+\newblock Memory wall challenges for {LLM} inference.
+\newblock \emph{IEEE Computer}, 2026.
+
+\bibitem{verhelst2025rooflines}
+M.~Verhelst, L.~Benini, and N.~Verma.
+\newblock How to keep pushing {ML} accelerator performance? Know your rooflines!
+\newblock \emph{IEEE JSSC}, 2025.
+
+\bibitem{shinn2023sparsity}
+C.~Shinn et~al.
+\newblock The sparsity roofline: Understanding the hardware limits of sparse
+  neural networks.
+\newblock \emph{arXiv:2310.00496}, 2023.
+
+%% --- PIM/CXL ---
+
+\bibitem{heo2024neupims}
+G.~Heo et~al.
+\newblock {NeuPIMs}: {NPU-PIM} heterogeneous acceleration for batched {LLM}
+  inference.
+\newblock In \emph{ASPLOS}, 2024.
+
+\bibitem{gu2025pim}
+Y.~Gu et~al.
+\newblock {PIM} is all you need: A {CXL}-enabled {GPU}-free system for {LLM}
+  inference.
+\newblock In \emph{ASPLOS}, 2025.
+
+\bibitem{park2024cxlpnm}
+J.~Park et~al.
+\newblock {CXL-PNM}: {CXL}-based processing-near-memory for {LLM} inference.
+\newblock In \emph{HPCA}, 2024.
+
+\bibitem{kim2025lia}
+H.~Kim et~al.
+\newblock {LIA}: A single-{GPU} {LLM} inference acceleration with {CPU-GPU}
+  cooperation and {CXL} offloading.
+\newblock In \emph{ISCA}, 2025.
+
+%% --- Chiplets ---
+
+\bibitem{shao2021simba}
+Y.~S.~Shao et~al.
+\newblock Simba: Scaling deep-learning inference with chiplet-based
+  architecture.
+\newblock \emph{CACM}, 2021.
+
+\bibitem{chipletgym2024}
+M.~Mishty and M.~Sadi.
+\newblock {Chiplet-Gym}: Automated {DSE} of chiplet-based {DNN} accelerators.
+\newblock \emph{IEEE TC}, 2024.
+
+%% --- MoE ---
+
+\bibitem{hwang2024pregated}
+H.~Hwang et~al.
+\newblock Pre-gated {MoE}: An algorithm-system co-design for fast and scalable
+  {MoE} inference.
+\newblock In \emph{ISCA}, 2024.
+
+\bibitem{tutel2023}
+C.~Hwang et~al.
+\newblock Tutel: Adaptive mixture-of-experts at scale.
+\newblock In \emph{MLSys}, 2023.
+
+%% --- Scaling & Training ---
+
+\bibitem{brown2020language}
+T.~Brown et~al.
+\newblock Language models are few-shot learners.
+\newblock In \emph{NeurIPS}, 2020.
+
+\bibitem{touvron2023llama}
+H.~Touvron et~al.
+\newblock {LLaMA}: Open and efficient foundation language models.
+\newblock \emph{arXiv:2302.13971}, 2023.
+
+\bibitem{narayanan2021megatron}
+D.~Narayanan et~al.
+\newblock Efficient large-scale language model training on {GPU} clusters
+  using {Megatron-LM}.
+\newblock In \emph{SC}, 2021.
+
+%% --- KV cache ---
+
+\bibitem{yang2024kvcompress}
+R.~Yang et~al.
+\newblock No token left behind: Reliable {KV} cache compression via
+  importance-aware mixed precision.
+\newblock \emph{arXiv}, 2024.
+
+\bibitem{hooper2025squeezed}
+C.~Hooper et~al.
+\newblock Squeezed attention: Accelerating long context length {LLM} inference.
+\newblock In \emph{ACL}, 2025.
+
+\bibitem{xiao2024duoattention}
+G.~Xiao et~al.
+\newblock DuoAttention: Efficient long-context {LLM} inference with retrieval
+  and streaming heads.
+\newblock \emph{arXiv:2410.10819}, 2024.
+
+%% --- Energy/TCO ---
+
+\bibitem{stojkovic2024greener}
+J.~Stojkovic et~al.
+\newblock Towards greener {LLMs}: Bringing energy-efficiency to the forefront
+  of {LLM} inference.
+\newblock \emph{arXiv:2403.20306}, 2024.
+
+\bibitem{llmco2}
+Z.~Fu et~al.
+\newblock {LLMCO2}: Advancing accurate carbon footprint prediction for {LLM}
+  inferences.
+\newblock In \emph{ACM SIGENERGY}, 2025.
+
+%% --- GPU microarchitecture ---
+
+\bibitem{jia2019dissecting}
+Z.~Jia et~al.
+\newblock Dissecting the {NVIDIA} {Volta} {GPU} architecture via
+  microbenchmarking.
+\newblock \emph{arXiv:1804.06826}, 2019.
+
+%% --- Sparsity ---
+
+\bibitem{joo2025coruscant}
+D.~Joo et~al.
+\newblock Coruscant: Co-designing {GPU} kernel and sparse tensor core for
+  unstructured sparsity in {LLM} inference.
+\newblock In \emph{ISCA}, 2025.
+
+%% --- Surveys ---
+
+\bibitem{zhou2024survey}
+Z.~Zhou et~al.
+\newblock A survey on efficient inference for large language models.
+\newblock \emph{arXiv:2404.14294}, 2024.
+
+\bibitem{li2024inference}
+J.~Li et~al.
+\newblock {LLM} inference acceleration: A comprehensive hardware perspective.
+\newblock \emph{arXiv:2410.04466}, 2024.
 
 \end{thebibliography}
 

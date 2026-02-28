@@ -77,19 +77,20 @@ def analyze_bottleneck_patterns(profiling: List[dict]) -> List[Insight]:
     for task in profiling:
         if "error" in task:
             continue
-        phase = task.get("config", {}).get("phase", "")
-        ops = task.get("operators", [])
+        phase = task.get("phase", "")
+        layer_report = task.get("layer_report", {})
+        ops = layer_report.get("operator_reports", [])
         for op in ops:
             bottleneck = op.get("bottleneck", "")
             if phase == "prefill":
-                if bottleneck == "compute":
+                if "compute" in bottleneck:
                     prefill_compute += 1
-                elif bottleneck == "memory":
+                elif "memory" in bottleneck:
                     prefill_memory += 1
             elif phase == "decode":
-                if bottleneck == "compute":
+                if "compute" in bottleneck:
                     decode_compute += 1
-                elif bottleneck == "memory":
+                elif "memory" in bottleneck:
                     decode_memory += 1
 
     total_prefill = prefill_compute + prefill_memory
@@ -122,11 +123,13 @@ def analyze_bottleneck_patterns(profiling: List[dict]) -> List[Insight]:
     for task in profiling:
         if "error" in task:
             continue
-        phase = task.get("config", {}).get("phase", "")
-        for op in task.get("operators", []):
-            name = op.get("name", "")
+        phase = task.get("phase", "")
+        layer_report = task.get("layer_report", {})
+        for op in layer_report.get("operator_reports", []):
+            name = op.get("operator_name", "")
             bottleneck = op.get("bottleneck", "")
-            key = f"{phase}_{bottleneck}"
+            bn_key = "compute" if "compute" in bottleneck else "memory"
+            key = f"{phase}_{bn_key}"
             if key in op_bottlenecks[name]:
                 op_bottlenecks[name][key] += 1
 
@@ -157,9 +160,10 @@ def analyze_bottleneck_patterns(profiling: List[dict]) -> List[Insight]:
     for task in profiling:
         if "error" in task:
             continue
-        for op in task.get("operators", []):
+        layer_report = task.get("layer_report", {})
+        for op in layer_report.get("operator_reports", []):
             lat = op.get("latency_seconds", 0)
-            op_latency_total[op.get("name", "")] += lat
+            op_latency_total[op.get("operator_name", "")] += lat
             total_lat += lat
 
     top_ops = sorted(op_latency_total.items(), key=lambda x: x[1], reverse=True)[:5]
@@ -328,13 +332,12 @@ def analyze_scaling(profiling: List[dict]) -> List[Insight]:
     for task in profiling:
         if "error" in task:
             continue
-        cfg = task.get("config", {})
-        model = cfg.get("model_name", "")
-        phase = cfg.get("phase", "")
-        dc = cfg.get("device_count", 1)
+        model = task.get("model_name", "")
+        phase = task.get("phase", "")
+        dc = task.get("device_count", 1)
         total_lat = task.get("total_latency_seconds", 0)
         if total_lat > 0:
-            key = (model, phase, cfg.get("batch_size", 1), cfg.get("seq_len", 1024))
+            key = (model, phase, task.get("batch_size", 1), task.get("seq_len", 1024))
             scaling_data[key][dc] = total_lat
 
     # Compute scaling efficiencies

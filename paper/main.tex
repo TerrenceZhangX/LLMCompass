@@ -55,7 +55,7 @@ Roofline Model, Hardware-Software Co-Design}
 The deployment of Large Language Models (LLMs) at scale has become one of
 the dominant workloads in modern datacenters. Models such as GPT-3
 (175B parameters)~\cite{brown2020language}, LLaMA (7B--70B)~\cite{touvron2023llama},
-and their successors require massive compute and memory bandwidthfor inference serving. As LLM inference becomes a first-class design target
+and their successors require massive compute and memory bandwidth for inference serving. As LLM inference becomes a first-class design target
 for GPU vendors, understanding the precise architectural bottlenecks and
 tradeoffs is critical.
 
@@ -358,7 +358,7 @@ Three critical observations emerge (Figure~\ref{fig:sensitivity}):
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/sensitivity_heatmap}
+\includegraphics[width=0.95\columnwidth]{figures/sensitivity_heatmap_corrected}
 \caption{Parameter sensitivity heatmap. Systolic array dimension dominates
 prefill, HBM channels dominate decode, and core count drives die area.
 SRAM and global buffer have \emph{zero} measurable latency effect.}
@@ -403,9 +403,9 @@ workloads benefit significantly from on-chip data reuse
 \centering
 \includegraphics[width=0.95\textwidth]{figures/oat_sensitivity}
 \caption{One-at-a-time sensitivity analysis. (a)~SA dimension yields
-quadratic prefill reduction; (b)~HBM channels provide linear decode
-improvement; (c)~Core count shows diminishing returns with negative
-ROI beyond 128 cores.}
+quadratic prefill reduction; (b)~HBM channels provide sub-linear decode
+improvement (not linear due to compute floor); (c)~Core count shows
+diminishing returns at high counts.}
 \label{fig:oat}
 \end{figure*}
 

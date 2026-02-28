@@ -1,0 +1,328 @@
+{
+  "_description": "Representative AI workload matrix for GPU bottleneck analysis using LLMCompass",
+  "_version": "1.0",
+  "_date": "2026-02-28",
+
+  "models": {
+    "gpt2_small": {
+      "name": "GPT-2 Small (117M)",
+      "d_model": 768,
+      "n_heads": 12,
+      "n_layers": 12,
+      "params_approx": "117M",
+      "notes": "Smallest baseline; compute-light, useful for isolating memory/overhead effects"
+    },
+    "llama_7b": {
+      "name": "LLaMA-7B",
+      "d_model": 4096,
+      "n_heads": 32,
+      "n_layers": 32,
+      "params_approx": "6.7B",
+      "notes": "Widely deployed edge/server model; moderate compute and memory requirements"
+    },
+    "llama_13b": {
+      "name": "LLaMA-13B",
+      "d_model": 5120,
+      "n_heads": 40,
+      "n_layers": 40,
+      "params_approx": "13B",
+      "notes": "Mid-range model; begins to stress single-GPU memory capacity"
+    },
+    "llama_70b": {
+      "name": "LLaMA-70B",
+      "d_model": 8192,
+      "n_heads": 64,
+      "n_layers": 80,
+      "params_approx": "70B",
+      "notes": "Large model requiring multi-GPU TP; stresses both compute and memory BW"
+    },
+    "gpt3_175b": {
+      "name": "GPT-3 175B",
+      "d_model": 12288,
+      "n_heads": 96,
+      "n_layers": 96,
+      "params_approx": "175B",
+      "notes": "Very large model; requires aggressive TP; pushes interconnect limits"
+    }
+  },
+
+  "workload_scenarios": {
+    "single_request_short": {
+      "batch_size": 1,
+      "seq_len": 128,
+      "label": "Single request, short context",
+      "expected_regime": "memory_bound",
+      "notes": "Minimal arithmetic intensity; dominated by weight loading latency"
+    },
+    "single_request_medium": {
+      "batch_size": 1,
+      "seq_len": 512,
+      "label": "Single request, medium context",
+      "expected_regime": "memory_bound",
+      "notes": "Typical chatbot single-turn; still weight-loading dominated for decode"
+    },
+    "single_request_long": {
+      "batch_size": 1,
+      "seq_len": 2048,
+      "label": "Single request, long context",
+      "expected_regime": "memory_bound_to_balanced",
+      "notes": "Document summarization scenario; KV cache starts to matter in decode"
+    },
+    "small_batch_medium": {
+      "batch_size": 4,
+      "seq_len": 512,
+      "label": "Small batch, medium context",
+      "expected_regime": "balanced",
+      "notes": "Light batching; transition region between memory-bound and compute-bound"
+    },
+    "medium_batch_medium": {
+      "batch_size": 16,
+      "seq_len": 1024,
+      "label": "Medium batch, medium context",
+      "expected_regime": "balanced_to_compute_bound",
+      "notes": "Typical server deployment; good arithmetic intensity for prefill"
+    },
+    "large_batch_short": {
+      "batch_size": 32,
+      "seq_len": 256,
+      "label": "Large batch, short context",
+      "expected_regime": "compute_bound",
+      "notes": "High-throughput API serving; large batch amortizes memory accesses"
+    },
+    "large_batch_medium": {
+      "batch_size": 32,
+      "seq_len": 1024,
+      "label": "Large batch, medium context",
+      "expected_regime": "compute_bound",
+      "notes": "Throughput-optimized serving; strongly compute-bound for prefill"
+    },
+    "large_batch_long": {
+      "batch_size": 32,
+      "seq_len": 2048,
+      "label": "Large batch, long context",
+      "expected_regime": "compute_bound",
+      "notes": "Extreme compute scenario; attention QK^T is O(bs*s^2) — tests compute ceiling"
+    },
+    "long_context_single": {
+      "batch_size": 1,
+      "seq_len": 8192,
+      "label": "Very long context, single request",
+      "expected_regime": "kv_cache_bound",
+      "notes": "Long-document / retrieval use case; KV cache dominates decode memory traffic"
+    },
+    "long_context_batched": {
+      "batch_size": 4,
+      "seq_len": 4096,
+      "label": "Long context, small batch",
+      "expected_regime": "balanced_to_kv_cache_bound",
+      "notes": "Multi-document processing; stresses both KV cache and compute for prefill"
+    }
+  },
+
+  "phases": ["prefill", "decode"],
+
+  "device_count_options": [1, 2, 4, 8],
+
+  "data_type": "fp16",
+
+  "task_matrix": [
+    {
+      "id": "CB-01",
+      "regime": "compute_bound",
+      "description": "Large-batch prefill on a large model — saturates compute units",
+      "model": "llama_70b",
+      "scenario": "large_batch_medium",
+      "phase": "prefill",
+      "device_count": 4
+    },
+    {
+      "id": "CB-02",
+      "regime": "compute_bound",
+      "description": "Large-batch long-sequence prefill — quadratic attention dominates",
+      "model": "gpt3_175b",
+      "scenario": "large_batch_long",
+      "phase": "prefill",
+      "device_count": 8
+    },
+    {
+      "id": "CB-03",
+      "regime": "compute_bound",
+      "description": "Medium model, large batch prefill — healthy compute utilization",
+      "model": "llama_7b",
+      "scenario": "large_batch_short",
+      "phase": "prefill",
+      "device_count": 1
+    },
+    {
+      "id": "MB-01",
+      "regime": "memory_bound",
+      "description": "Single-request decode — each step loads all weights for one token",
+      "model": "llama_7b",
+      "scenario": "single_request_short",
+      "phase": "decode",
+      "device_count": 1
+    },
+    {
+      "id": "MB-02",
+      "regime": "memory_bound",
+      "description": "Single-request decode on large model — weight loading dominance",
+      "model": "llama_70b",
+      "scenario": "single_request_medium",
+      "phase": "decode",
+      "device_count": 4
+    },
+    {
+      "id": "MB-03",
+      "regime": "memory_bound",
+      "description": "Small model decode — overhead and memory bandwidth limited",
+      "model": "gpt2_small",
+      "scenario": "single_request_short",
+      "phase": "decode",
+      "device_count": 1
+    },
+    {
+      "id": "MB-04",
+      "regime": "memory_bound",
+      "description": "Very large model single decode — extreme weight loading pressure",
+      "model": "gpt3_175b",
+      "scenario": "single_request_short",
+      "phase": "decode",
+      "device_count": 8
+    },
+    {
+      "id": "BAL-01",
+      "regime": "balanced",
+      "description": "Medium batch decode — batch amortizes weight loading partially",
+      "model": "llama_7b",
+      "scenario": "small_batch_medium",
+      "phase": "decode",
+      "device_count": 1
+    },
+    {
+      "id": "BAL-02",
+      "regime": "balanced",
+      "description": "Medium batch prefill on medium model — near roofline knee",
+      "model": "llama_13b",
+      "scenario": "medium_batch_medium",
+      "phase": "prefill",
+      "device_count": 4
+    },
+    {
+      "id": "BAL-03",
+      "regime": "balanced",
+      "description": "Small batch prefill — compute starts to dominate but not saturated",
+      "model": "llama_7b",
+      "scenario": "small_batch_medium",
+      "phase": "prefill",
+      "device_count": 1
+    },
+    {
+      "id": "LC-01",
+      "regime": "long_context",
+      "description": "Very long context decode — KV cache read dominates memory traffic",
+      "model": "llama_7b",
+      "scenario": "long_context_single",
+      "phase": "decode",
+      "device_count": 1
+    },
+    {
+      "id": "LC-02",
+      "regime": "long_context",
+      "description": "Long context batched decode — KV cache + weight loading combined",
+      "model": "llama_70b",
+      "scenario": "long_context_batched",
+      "phase": "decode",
+      "device_count": 4
+    },
+    {
+      "id": "LC-03",
+      "regime": "long_context",
+      "description": "Long context prefill — quadratic attention with long sequences",
+      "model": "llama_13b",
+      "scenario": "long_context_single",
+      "phase": "prefill",
+      "device_count": 4
+    },
+    {
+      "id": "IC-01",
+      "regime": "interconnect_sensitive",
+      "description": "Large model with high TP degree — AllReduce becomes significant",
+      "model": "gpt3_175b",
+      "scenario": "single_request_medium",
+      "phase": "decode",
+      "device_count": 8
+    },
+    {
+      "id": "IC-02",
+      "regime": "interconnect_sensitive",
+      "description": "Same model with lower TP — less interconnect, more per-device compute",
+      "model": "gpt3_175b",
+      "scenario": "single_request_medium",
+      "phase": "decode",
+      "device_count": 4
+    },
+    {
+      "id": "SC-01",
+      "regime": "scaling_study",
+      "description": "TP scaling: same workload across 1/2/4/8 GPUs — prefill",
+      "model": "llama_70b",
+      "scenario": "medium_batch_medium",
+      "phase": "prefill",
+      "device_count": [1, 2, 4, 8],
+      "notes": "Run once per device_count to study TP scaling efficiency"
+    },
+    {
+      "id": "SC-02",
+      "regime": "scaling_study",
+      "description": "TP scaling: same workload across 1/2/4/8 GPUs — decode",
+      "model": "llama_70b",
+      "scenario": "medium_batch_medium",
+      "phase": "decode",
+      "device_count": [1, 2, 4, 8],
+      "notes": "Run once per device_count to study TP scaling efficiency"
+    },
+    {
+      "id": "SZ-01",
+      "regime": "model_size_sweep",
+      "description": "Fixed workload, vary model size — isolate model-size effects",
+      "model": ["gpt2_small", "llama_7b", "llama_13b", "llama_70b", "gpt3_175b"],
+      "scenario": "medium_batch_medium",
+      "phase": "prefill",
+      "device_count": 4,
+      "notes": "gpt2_small uses device_count=4 (12 heads / 4 = 3 heads/device)"
+    },
+    {
+      "id": "SZ-02",
+      "regime": "model_size_sweep",
+      "description": "Fixed workload, vary model size — decode phase",
+      "model": ["gpt2_small", "llama_7b", "llama_13b", "llama_70b", "gpt3_175b"],
+      "scenario": "small_batch_medium",
+      "phase": "decode",
+      "device_count": 4,
+      "notes": "Shows how decode memory-boundedness scales with model size"
+    }
+  ],
+
+  "sensitivity_analysis_tasks": [
+    {
+      "id": "SENS-BS",
+      "description": "Batch size sensitivity — fix model & seq_len, sweep batch_size",
+      "model": "llama_7b",
+      "seq_len": 1024,
+      "batch_sizes": [1, 2, 4, 8, 16, 32, 64],
+      "phases": ["prefill", "decode"],
+      "device_count": 1,
+      "notes": "Shows compute-vs-memory transition as batch size increases"
+    },
+    {
+      "id": "SENS-SL",
+      "description": "Sequence length sensitivity — fix model & batch_size, sweep seq_len",
+      "model": "llama_7b",
+      "batch_size": 8,
+      "seq_lens": [128, 256, 512, 1024, 2048, 4096, 8192],
+      "phases": ["prefill", "decode"],
+      "device_count": 1,
+      "notes": "Shows quadratic attention cost (prefill) and KV cache scaling (decode)"
+    }
+  ]
+}

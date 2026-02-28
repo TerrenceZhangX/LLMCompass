@@ -34,17 +34,17 @@ class GeLU(Operator):
         )
         M = self.M
         data_type = self.computational_graph.data_type
-        total_io_count = M * 2 * data_type.word_size
+        self.io_count = M * 2 * data_type.word_size
         io_latency = (
-            total_io_count / min(pcb_module.io_module.bandwidth
+            self.io_count / min(pcb_module.io_module.bandwidth
             , pcb_module.compute_module.l2_bandwidth_per_cycle
             * pcb_module.compute_module.clock_freq)
         )
-        total_flop_count = M * (
+        self.flop_count = M * (
             10 + pcb_module.compute_module.core.vector_unit.flops_per_exp
         )
         compute_latency = (
-            total_flop_count
+            self.flop_count
             / pcb_module.compute_module.core.vector_unit.total_vector_flops_per_cycle
             / pcb_module.compute_module.core_count
             / pcb_module.compute_module.clock_freq
